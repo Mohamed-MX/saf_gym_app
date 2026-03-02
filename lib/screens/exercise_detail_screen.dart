@@ -1,60 +1,33 @@
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
+import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../models/exercise.dart';
-import '../services/favorites_service.dart';
+import '../services/muscle_wiki_service.dart';
+import '../viewmodels/exercise_detail_viewmodel.dart';
 import '../theme/app_theme.dart';
 
-class ExerciseDetailScreen extends StatefulWidget {
-  final Exercise exercise;
+class ExerciseDetailScreen extends StatelessWidget {
+  final MuscleWikiExercise exercise;
 
   const ExerciseDetailScreen({super.key, required this.exercise});
 
   @override
-  State<ExerciseDetailScreen> createState() => _ExerciseDetailScreenState();
+  Widget build(BuildContext context) {
+    return ChangeNotifierProvider(
+      create: (_) =>
+          ExerciseDetailViewModel()..checkFavorite(exercise.id),
+      child: _ExerciseDetailView(exercise: exercise),
+    );
+  }
 }
 
-class _ExerciseDetailScreenState extends State<ExerciseDetailScreen> {
-  final FavoritesService _favoritesService = FavoritesService();
-  bool _isFavorite = false;
-  int _currentImageIndex = 0;
+class _ExerciseDetailView extends StatelessWidget {
+  final MuscleWikiExercise exercise;
 
-  @override
-  void initState() {
-    super.initState();
-    _checkFavorite();
-  }
-
-  Future<void> _checkFavorite() async {
-    final isFav = await _favoritesService.isFavorite(widget.exercise.id);
-    if (mounted) {
-      setState(() => _isFavorite = isFav);
-    }
-  }
-
-  Future<void> _toggleFavorite() async {
-    final result = await _favoritesService.toggleFavorite(widget.exercise.id);
-    if (mounted) {
-      setState(() => _isFavorite = result);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            result ? 'Added to favorites!' : 'Removed from favorites',
-          ),
-          duration: const Duration(seconds: 1),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppTheme.radiusSm),
-          ),
-          backgroundColor: AppTheme.primaryBlue,
-        ),
-      );
-    }
-  }
+  const _ExerciseDetailView({required this.exercise});
 
   @override
   Widget build(BuildContext context) {
-    final exercise = widget.exercise;
+    final vm = context.watch<ExerciseDetailViewModel>();
 
     return Scaffold(
       backgroundColor: AppTheme.offWhite,
@@ -89,87 +62,69 @@ class _ExerciseDetailScreenState extends State<ExerciseDetailScreen> {
                     borderRadius: BorderRadius.circular(AppTheme.radiusSm),
                   ),
                   child: Icon(
-                    _isFavorite ? Icons.favorite : Icons.favorite_border,
+                    vm.isFavorite ? Icons.favorite : Icons.favorite_border,
                     size: 20,
-                    color: _isFavorite ? Colors.red : AppTheme.charcoal,
+                    color: vm.isFavorite ? Colors.red : AppTheme.charcoal,
                   ),
                 ),
-                onPressed: _toggleFavorite,
+                onPressed: () async {
+                  final result = await context
+                      .read<ExerciseDetailViewModel>()
+                      .toggleFavorite(exercise.id, exercise);
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          result
+                              ? 'Added to favorites!'
+                              : 'Removed from favorites',
+                        ),
+                        duration: const Duration(seconds: 1),
+                        behavior: SnackBarBehavior.floating,
+                        shape: RoundedRectangleBorder(
+                          borderRadius:
+                              BorderRadius.circular(AppTheme.radiusSm),
+                        ),
+                        backgroundColor: AppTheme.primaryBlue,
+                      ),
+                    );
+                  }
+                },
               ),
               const SizedBox(width: 8),
             ],
             flexibleSpace: FlexibleSpaceBar(
-              background: exercise.images.isNotEmpty
-                  ? Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        // Image carousel
-                        PageView.builder(
-                          itemCount: exercise.images.length,
-                          onPageChanged: (index) {
-                            setState(() => _currentImageIndex = index);
-                          },
-                          itemBuilder: (context, index) {
-                            return Hero(
-                              tag: index == 0
-                                  ? 'exercise_image_${exercise.id}'
-                                  : 'exercise_image_${exercise.id}_$index',
-                              child: CachedNetworkImage(
-                                imageUrl: exercise.images[index].image,
-                                fit: BoxFit.cover,
-                                placeholder: (context, url) => Container(
-                                  color: AppTheme.primaryBlue
-                                      .withValues(alpha: 0.1),
-                                  child: const Center(
-                                    child: CircularProgressIndicator(
-                                      color: AppTheme.primaryBlue,
-                                    ),
-                                  ),
-                                ),
-                                errorWidget: (context, url, error) =>
-                                    Container(
-                                  color: AppTheme.primaryBlue
-                                      .withValues(alpha: 0.1),
-                                  child: const Icon(
-                                    Icons.fitness_center,
-                                    size: 80,
-                                    color: AppTheme.primaryBlue,
-                                  ),
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                        // Image indicators
-                        if (exercise.images.length > 1)
-                          Positioned(
-                            bottom: 16,
-                            left: 0,
-                            right: 0,
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: List.generate(
-                                exercise.images.length,
-                                (index) => AnimatedContainer(
-                                  duration: const Duration(milliseconds: 300),
-                                  width:
-                                      index == _currentImageIndex ? 24 : 8,
-                                  height: 8,
-                                  margin:
-                                      const EdgeInsets.symmetric(horizontal: 3),
-                                  decoration: BoxDecoration(
-                                    color: index == _currentImageIndex
-                                        ? AppTheme.white
-                                        : AppTheme.white
-                                            .withValues(alpha: 0.4),
-                                    borderRadius: BorderRadius.circular(
-                                        AppTheme.radiusFull),
-                                  ),
-                                ),
+              background: exercise.displayImageUrl != null
+                  ? Hero(
+                      tag: 'exercise_image_${exercise.id}',
+                      child: Image.network(
+                        exercise.displayImageUrl!,
+                        fit: BoxFit.cover,
+                        loadingBuilder: (context, child, progress) {
+                          if (progress == null) return child;
+                          return Container(
+                            color:
+                                AppTheme.primaryBlue.withValues(alpha: 0.1),
+                            child: const Center(
+                              child: CircularProgressIndicator(
+                                color: AppTheme.primaryBlue,
                               ),
                             ),
+                          );
+                        },
+                        errorBuilder: (context, err, trace) => Container(
+                          decoration: const BoxDecoration(
+                            gradient: AppTheme.heroGradient,
                           ),
-                      ],
+                          child: const Center(
+                            child: Icon(
+                              Icons.fitness_center,
+                              size: 80,
+                              color: AppTheme.white,
+                            ),
+                          ),
+                        ),
+                      ),
                     )
                   : Container(
                       decoration: const BoxDecoration(
@@ -193,30 +148,30 @@ class _ExerciseDetailScreenState extends State<ExerciseDetailScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Category badge
-                  if (exercise.categoryName.isNotEmpty)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppTheme.primaryBlue,
-                        borderRadius:
-                            BorderRadius.circular(AppTheme.radiusFull),
-                      ),
-                      child: Text(
-                        exercise.categoryName,
-                        style: const TextStyle(
-                          color: AppTheme.white,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
+                  // ── Muscle / Difficulty badges ──
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      if (exercise.muscleSlug != null)
+                        _badge(
+                          MuscleWikiService.muscleDisplayNames[
+                                  exercise.muscleSlug] ??
+                              exercise.muscleSlug!,
+                          AppTheme.primaryBlue,
+                          AppTheme.white,
                         ),
-                      ),
-                    ),
+                      if (exercise.difficulty != null)
+                        _badge(
+                          exercise.difficulty!,
+                          AppTheme.primaryBlue.withValues(alpha: 0.1),
+                          AppTheme.primaryBlue,
+                        ),
+                    ],
+                  ),
                   const SizedBox(height: 12),
 
-                  // Exercise name
+                  // ── Name ──
                   Text(
                     exercise.name,
                     style: GoogleFonts.outfit(
@@ -227,39 +182,37 @@ class _ExerciseDetailScreenState extends State<ExerciseDetailScreen> {
                   ),
                   const SizedBox(height: 24),
 
-                  // ── Target Muscles ──
-                  if (exercise.muscles.isNotEmpty) ...[
-                    _buildSectionTitle('Target Muscles'),
+                  // ── Primary Muscles ──
+                  if (exercise.primaryMuscles.isNotEmpty) ...[
+                    _sectionTitle('Target Muscles'),
                     const SizedBox(height: 12),
                     Wrap(
                       spacing: 8,
                       runSpacing: 8,
-                      children: exercise.muscles.map((muscle) {
+                      children: exercise.primaryMuscles.map((muscle) {
                         return Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 14,
                             vertical: 8,
                           ),
                           decoration: BoxDecoration(
-                            color: AppTheme.primaryBlue.withValues(alpha: 0.1),
+                            color: AppTheme.primaryBlue
+                                .withValues(alpha: 0.1),
                             borderRadius:
                                 BorderRadius.circular(AppTheme.radiusFull),
                             border: Border.all(
-                              color:
-                                  AppTheme.primaryBlue.withValues(alpha: 0.2),
+                              color: AppTheme.primaryBlue
+                                  .withValues(alpha: 0.2),
                             ),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(
-                                Icons.circle,
-                                size: 8,
-                                color: AppTheme.primaryBlue,
-                              ),
+                              const Icon(Icons.circle,
+                                  size: 8, color: AppTheme.primaryBlue),
                               const SizedBox(width: 8),
                               Text(
-                                muscle.displayName,
+                                muscle,
                                 style: const TextStyle(
                                   fontSize: 14,
                                   fontWeight: FontWeight.w600,
@@ -275,87 +228,57 @@ class _ExerciseDetailScreenState extends State<ExerciseDetailScreen> {
                   ],
 
                   // ── Secondary Muscles ──
-                  if (exercise.musclesSecondary.isNotEmpty) ...[
-                    _buildSectionTitle('Secondary Muscles'),
+                  // (API does not provide secondary muscles in list endpoint)
+
+                  // ── Equipment / Category ──
+                  if (exercise.category != null &&
+                      exercise.category!.isNotEmpty) ...[
+                    _sectionTitle('Equipment'),
                     const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: exercise.musclesSecondary.map((muscle) {
-                        return Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 8,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppTheme.lightGrey,
-                            borderRadius:
-                                BorderRadius.circular(AppTheme.radiusFull),
-                          ),
-                          child: Text(
-                            muscle.displayName,
-                            style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w500,
-                              color: AppTheme.darkGrey,
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: AppTheme.white,
+                        borderRadius:
+                            BorderRadius.circular(AppTheme.radiusSm),
+                        boxShadow: AppTheme.cardShadow,
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: AppTheme.primaryBlue
+                                  .withValues(alpha: 0.1),
+                              borderRadius:
+                                  BorderRadius.circular(AppTheme.radiusSm),
+                            ),
+                            child: const Icon(
+                              Icons.fitness_center,
+                              color: AppTheme.primaryBlue,
+                              size: 20,
                             ),
                           ),
-                        );
-                      }).toList(),
+                          const SizedBox(width: 14),
+                          Text(
+                            exercise.category!,
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              color: AppTheme.charcoal,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                     const SizedBox(height: 24),
                   ],
 
-                  // ── Equipment ──
-                  if (exercise.equipment.isNotEmpty) ...[
-                    _buildSectionTitle('Equipment Needed'),
-                    const SizedBox(height: 12),
-                    ...exercise.equipment.map((eq) {
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: 8),
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color: AppTheme.white,
-                          borderRadius:
-                              BorderRadius.circular(AppTheme.radiusSm),
-                          boxShadow: AppTheme.cardShadow,
-                        ),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 40,
-                              height: 40,
-                              decoration: BoxDecoration(
-                                color: AppTheme.primaryBlue
-                                    .withValues(alpha: 0.1),
-                                borderRadius:
-                                    BorderRadius.circular(AppTheme.radiusSm),
-                              ),
-                              child: const Icon(
-                                Icons.fitness_center,
-                                color: AppTheme.primaryBlue,
-                                size: 20,
-                              ),
-                            ),
-                            const SizedBox(width: 14),
-                            Text(
-                              eq.name,
-                              style: const TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w600,
-                                color: AppTheme.charcoal,
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    }),
-                    const SizedBox(height: 24),
-                  ],
-
-                  // ── Description ──
-                  if (exercise.description.isNotEmpty) ...[
-                    _buildSectionTitle('Instructions'),
+                  // ── Instructions (Steps) ──
+                  if (exercise.steps.isNotEmpty) ...[
+                    _sectionTitle('Instructions'),
                     const SizedBox(height: 12),
                     Container(
                       padding: const EdgeInsets.all(20),
@@ -365,13 +288,55 @@ class _ExerciseDetailScreenState extends State<ExerciseDetailScreen> {
                             BorderRadius.circular(AppTheme.radiusMd),
                         boxShadow: AppTheme.cardShadow,
                       ),
-                      child: Text(
-                        exercise.description,
-                        style: const TextStyle(
-                          fontSize: 15,
-                          height: 1.6,
-                          color: AppTheme.darkGrey,
-                        ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: exercise.steps
+                            .asMap()
+                            .entries
+                            .map((entry) {
+                          final stepNum = entry.key + 1;
+                          final stepText = entry.value;
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: Row(
+                              crossAxisAlignment:
+                                  CrossAxisAlignment.start,
+                              children: [
+                                Container(
+                                  width: 24,
+                                  height: 24,
+                                  margin: const EdgeInsets.only(
+                                      top: 1, right: 10),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.primaryBlue,
+                                    borderRadius:
+                                        BorderRadius.circular(12),
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      '$stepNum',
+                                      style: const TextStyle(
+                                        color: AppTheme.white,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                Expanded(
+                                  child: Text(
+                                    stepText,
+                                    style: const TextStyle(
+                                      fontSize: 15,
+                                      height: 1.5,
+                                      color: AppTheme.darkGrey,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }).toList(),
                       ),
                     ),
                   ],
@@ -386,7 +351,25 @@ class _ExerciseDetailScreenState extends State<ExerciseDetailScreen> {
     );
   }
 
-  Widget _buildSectionTitle(String title) {
+  Widget _badge(String label, Color bg, Color fg) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(AppTheme.radiusFull),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: fg,
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+
+  Widget _sectionTitle(String title) {
     return Row(
       children: [
         Container(

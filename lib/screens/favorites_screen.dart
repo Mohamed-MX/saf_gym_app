@@ -1,71 +1,42 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../models/exercise.dart';
-import '../services/wger_api_service.dart';
-import '../services/favorites_service.dart';
+import '../viewmodels/favorites_viewmodel.dart';
 import '../widgets/exercise_card.dart';
 import '../widgets/shimmer_loading.dart';
 import '../theme/app_theme.dart';
 import 'exercise_detail_screen.dart';
 
-class FavoritesScreen extends StatefulWidget {
+class FavoritesScreen extends StatelessWidget {
   const FavoritesScreen({super.key});
 
   @override
-  State<FavoritesScreen> createState() => _FavoritesScreenState();
+  Widget build(BuildContext context) {
+    return ChangeNotifierProvider(
+      create: (_) => FavoritesViewModel()..loadFavorites(),
+      child: const _FavoritesView(),
+    );
+  }
 }
 
-class _FavoritesScreenState extends State<FavoritesScreen> {
-  final FavoritesService _favoritesService = FavoritesService();
-  final WgerApiService _apiService = WgerApiService();
-
-  List<Exercise> _exercises = [];
-  bool _isLoading = true;
+class _FavoritesView extends StatefulWidget {
+  const _FavoritesView();
 
   @override
-  void initState() {
-    super.initState();
-    _loadFavorites();
-  }
+  State<_FavoritesView> createState() => _FavoritesViewState();
+}
 
+class _FavoritesViewState extends State<_FavoritesView> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Reload favorites when returning to this screen
-    _loadFavorites();
-  }
-
-  Future<void> _loadFavorites() async {
-    setState(() => _isLoading = true);
-
-    try {
-      final favoriteIds = await _favoritesService.getFavorites();
-      if (favoriteIds.isEmpty) {
-        if (mounted) {
-          setState(() {
-            _exercises = [];
-            _isLoading = false;
-          });
-        }
-        return;
-      }
-
-      final exercises = await _apiService.getExercisesByIds(favoriteIds);
-      if (mounted) {
-        setState(() {
-          _exercises = exercises;
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
-    }
+    context.read<FavoritesViewModel>().loadFavorites();
   }
 
   @override
   Widget build(BuildContext context) {
+    final vm = context.watch<FavoritesViewModel>();
+
     return Scaffold(
       backgroundColor: AppTheme.offWhite,
       appBar: AppBar(
@@ -77,7 +48,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
         backgroundColor: AppTheme.offWhite,
         elevation: 0,
       ),
-      body: _isLoading
+      body: vm.isLoading
           ? Padding(
               padding: const EdgeInsets.all(24),
               child: Column(
@@ -87,22 +58,23 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                 ),
               ),
             )
-          : _exercises.isEmpty
+          : vm.exercises.isEmpty
               ? _buildEmptyState()
               : RefreshIndicator(
                   color: AppTheme.primaryBlue,
-                  onRefresh: _loadFavorites,
+                  onRefresh: () =>
+                      context.read<FavoritesViewModel>().loadFavorites(),
                   child: ListView.builder(
                     padding: const EdgeInsets.all(24),
-                    itemCount: _exercises.length,
+                    itemCount: vm.exercises.length,
                     itemBuilder: (context, index) {
-                      final exercise = _exercises[index];
+                      final exercise = vm.exercises[index];
                       return Dismissible(
                         key: Key('fav_${exercise.id}'),
                         direction: DismissDirection.endToStart,
                         background: Container(
-                          margin:
-                              const EdgeInsets.only(bottom: AppTheme.spacingMd),
+                          margin: const EdgeInsets.only(
+                              bottom: AppTheme.spacingMd),
                           decoration: BoxDecoration(
                             color: AppTheme.error,
                             borderRadius:
@@ -116,11 +88,10 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                           ),
                         ),
                         onDismissed: (direction) async {
-                          await _favoritesService.removeFavorite(exercise.id);
-                          setState(() {
-                            _exercises.removeAt(index);
-                          });
-                          if (mounted) {
+                          await context
+                              .read<FavoritesViewModel>()
+                              .removeFavorite(exercise.id);
+                          if (context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                 content:
@@ -143,11 +114,15 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                               context,
                               MaterialPageRoute(
                                 builder: (context) =>
-                                    ExerciseDetailScreen(exercise: exercise),
+                                    ExerciseDetailScreen(
+                                        exercise: exercise),
                               ),
                             );
-                            // Reload favorites after returning
-                            _loadFavorites();
+                            if (context.mounted) {
+                              context
+                                  .read<FavoritesViewModel>()
+                                  .loadFavorites();
+                            }
                           },
                         ),
                       );

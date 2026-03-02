@@ -70,27 +70,25 @@ class _SplashScreenState extends State<SplashScreen>
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // SAF Logo
+                // SAF Logo — transparent PNG inside white rounded box
                 Container(
                   width: 140,
                   height: 140,
                   decoration: BoxDecoration(
-                    color: AppTheme.white,
-                    borderRadius: BorderRadius.circular(AppTheme.radiusXl),
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(32),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.3),
-                        blurRadius: 30,
-                        offset: const Offset(0, 10),
+                        color: Colors.black.withValues(alpha: 0.25),
+                        blurRadius: 32,
+                        offset: const Offset(0, 12),
                       ),
                     ],
                   ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(AppTheme.radiusXl),
-                    child: Image.asset(
-                      'assets/icon.png',
-                      fit: BoxFit.contain,
-                    ),
+                  padding: const EdgeInsets.all(20),
+                  child: Image.asset(
+                    'assets/icon.png',
+                    fit: BoxFit.contain,
                   ),
                 ),
                 const SizedBox(height: 24),

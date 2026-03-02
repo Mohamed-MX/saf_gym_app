@@ -1,44 +1,77 @@
+import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'muscle_wiki_service.dart';
 
+/// Persists favourite exercises as full JSON so they can be displayed
+/// without any network call after the first load.
 class FavoritesService {
-  static const String _favoritesKey = 'favorite_exercises';
+  static const String _idsKey = 'favorite_exercise_ids';
+  static const String _prefix = 'fav_exercise_';
 
   Future<SharedPreferences> get _prefs => SharedPreferences.getInstance();
 
-  /// Get all favorite exercise IDs
-  Future<List<int>> getFavorites() async {
+  // ── Read ────────────────────────────────────────────────────────────────
+
+  Future<List<int>> getFavoriteIds() async {
     final prefs = await _prefs;
-    final favorites = prefs.getStringList(_favoritesKey) ?? [];
-    return favorites.map((id) => int.parse(id)).toList();
+    return (prefs.getStringList(_idsKey) ?? [])
+        .map(int.parse)
+        .toList();
   }
 
-  /// Check if an exercise is a favorite
   Future<bool> isFavorite(int exerciseId) async {
-    final favorites = await getFavorites();
-    return favorites.contains(exerciseId);
+    final ids = await getFavoriteIds();
+    return ids.contains(exerciseId);
   }
 
-  /// Toggle the favorite status of an exercise
-  Future<bool> toggleFavorite(int exerciseId) async {
+  /// Returns all favourite exercises in the order they were added.
+  Future<List<MuscleWikiExercise>> getFavoriteExercises() async {
     final prefs = await _prefs;
-    final favorites = prefs.getStringList(_favoritesKey) ?? [];
+    final ids = await getFavoriteIds();
+    final result = <MuscleWikiExercise>[];
+    for (final id in ids) {
+      final raw = prefs.getString('$_prefix$id');
+      if (raw != null) {
+        try {
+          result.add(MuscleWikiExercise.fromJson(jsonDecode(raw)));
+        } catch (_) {}
+      }
+    }
+    return result;
+  }
+
+  // ── Write ───────────────────────────────────────────────────────────────
+
+  /// Toggles favourite status. Stores the full exercise JSON on add so
+  /// the Favourites screen needs no network call.
+  /// Returns `true` if the exercise is now a favourite.
+  Future<bool> toggleFavorite(
+    int exerciseId,
+    MuscleWikiExercise exercise,
+  ) async {
+    final prefs = await _prefs;
+    final ids = prefs.getStringList(_idsKey) ?? [];
     final idStr = exerciseId.toString();
 
-    if (favorites.contains(idStr)) {
-      favorites.remove(idStr);
+    if (ids.contains(idStr)) {
+      ids.remove(idStr);
+      await prefs.remove('$_prefix$exerciseId');
+      await prefs.setStringList(_idsKey, ids);
+      return false;
     } else {
-      favorites.add(idStr);
+      ids.add(idStr);
+      await prefs.setString(
+          '$_prefix$exerciseId', jsonEncode(exercise.toJson()));
+      await prefs.setStringList(_idsKey, ids);
+      return true;
     }
-
-    await prefs.setStringList(_favoritesKey, favorites);
-    return favorites.contains(idStr);
   }
 
-  /// Remove a favorite
   Future<void> removeFavorite(int exerciseId) async {
     final prefs = await _prefs;
-    final favorites = prefs.getStringList(_favoritesKey) ?? [];
-    favorites.remove(exerciseId.toString());
-    await prefs.setStringList(_favoritesKey, favorites);
+    final ids = prefs.getStringList(_idsKey) ?? [];
+    ids.remove(exerciseId.toString());
+    await prefs.remove('$_prefix$exerciseId');
+    await prefs.setStringList(_idsKey, ids);
   }
 }

@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
-import '../models/exercise.dart';
+import '../services/muscle_wiki_service.dart';
 import '../theme/app_theme.dart';
 
 class ExerciseCard extends StatelessWidget {
-  final Exercise exercise;
+  final MuscleWikiExercise exercise;
   final VoidCallback onTap;
   final int index;
 
@@ -30,7 +29,7 @@ class ExerciseCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(AppTheme.radiusMd),
           child: Row(
             children: [
-              // Exercise Image
+              // ── Exercise Image / GIF ──────────────────────────────────
               Hero(
                 tag: 'exercise_image_${exercise.id}',
                 child: Container(
@@ -39,17 +38,20 @@ class ExerciseCard extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: AppTheme.primaryBlue.withValues(alpha: 0.08),
                   ),
-                  child: exercise.mainImageUrl != null
-                      ? CachedNetworkImage(
-                          imageUrl: exercise.mainImageUrl!,
+                  child: exercise.displayImageUrl != null
+                      ? Image.network(
+                          exercise.displayImageUrl!,
                           fit: BoxFit.cover,
-                          placeholder: (context, url) => const Center(
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: AppTheme.primaryBlue,
-                            ),
-                          ),
-                          errorWidget: (context, url, error) => const Icon(
+                          loadingBuilder: (context, child, progress) {
+                            if (progress == null) return child;
+                            return const Center(
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: AppTheme.primaryBlue,
+                              ),
+                            );
+                          },
+                          errorBuilder: (context, err, trace) => const Icon(
                             Icons.fitness_center,
                             color: AppTheme.primaryBlue,
                             size: 40,
@@ -62,14 +64,14 @@ class ExerciseCard extends StatelessWidget {
                         ),
                 ),
               ),
-              // Exercise Details
+              // ── Details ───────────────────────────────────────────────
               Expanded(
                 child: Padding(
                   padding: const EdgeInsets.all(AppTheme.spacingMd),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Exercise number badge
+                      // Badges row
                       Row(
                         children: [
                           Container(
@@ -91,22 +93,21 @@ class ExerciseCard extends StatelessWidget {
                               ),
                             ),
                           ),
-                          const SizedBox(width: 8),
-                          // Category badge
-                          if (exercise.categoryName.isNotEmpty)
+                          if (exercise.difficulty != null) ...[
+                            const SizedBox(width: 8),
                             Container(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 8,
                                 vertical: 3,
                               ),
                               decoration: BoxDecoration(
-                                color:
-                                    AppTheme.primaryBlue.withValues(alpha: 0.1),
-                                borderRadius:
-                                    BorderRadius.circular(AppTheme.radiusFull),
+                                color: AppTheme.primaryBlue
+                                    .withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(
+                                    AppTheme.radiusFull),
                               ),
                               child: Text(
-                                exercise.categoryName,
+                                exercise.difficulty!,
                                 style: const TextStyle(
                                   color: AppTheme.primaryBlue,
                                   fontSize: 11,
@@ -114,10 +115,11 @@ class ExerciseCard extends StatelessWidget {
                                 ),
                               ),
                             ),
+                          ],
                         ],
                       ),
                       const SizedBox(height: 6),
-                      // Exercise name
+                      // Name
                       Text(
                         exercise.name,
                         style: const TextStyle(
@@ -129,11 +131,11 @@ class ExerciseCard extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 4),
-                      // Muscles
-                      if (exercise.muscles.isNotEmpty)
+                      // Primary muscles
+                      if (exercise.primaryMuscles.isNotEmpty)
                         Row(
                           children: [
-                            Icon(
+                            const Icon(
                               Icons.sports_gymnastics,
                               size: 14,
                               color: AppTheme.mediumGrey,
@@ -141,10 +143,8 @@ class ExerciseCard extends StatelessWidget {
                             const SizedBox(width: 4),
                             Expanded(
                               child: Text(
-                                exercise.muscles
-                                    .map((m) => m.displayName)
-                                    .join(', '),
-                                style: TextStyle(
+                                exercise.primaryMusclesLabel,
+                                style: const TextStyle(
                                   fontSize: 12,
                                   color: AppTheme.darkGrey,
                                 ),
@@ -158,7 +158,7 @@ class ExerciseCard extends StatelessWidget {
                   ),
                 ),
               ),
-              // Arrow icon
+              // Arrow
               const Padding(
                 padding: EdgeInsets.only(right: 12),
                 child: Icon(

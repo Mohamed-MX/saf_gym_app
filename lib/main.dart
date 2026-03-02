@@ -4,7 +4,8 @@ import 'theme/app_theme.dart';
 import 'screens/splash_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/categories_screen.dart';
-import 'screens/favorites_screen.dart';
+import 'screens/muscle_selection_screen.dart';
+import 'screens/workout_plans_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -30,6 +31,7 @@ class SAFApp extends StatelessWidget {
       routes: {
         '/': (context) => const SplashScreen(),
         '/main': (context) => const MainShell(),
+        '/muscle-select': (context) => const MuscleSelectionScreen(),
       },
     );
   }
@@ -46,10 +48,10 @@ class MainShell extends StatefulWidget {
 class _MainShellState extends State<MainShell> {
   int _currentIndex = 0;
 
-  final List<Widget> _screens = [
-    const HomeScreen(),
-    const CategoriesScreen(),
-    const FavoritesScreen(),
+  final List<Widget> _screens = const [
+    HomeScreen(),
+    CategoriesScreen(),
+    WorkoutPlansScreen(),
   ];
 
   @override
@@ -88,8 +90,8 @@ class _MainShellState extends State<MainShell> {
                 ),
                 _buildNavItem(
                   index: 2,
-                  icon: Icons.favorite_rounded,
-                  label: 'Favorites',
+                  icon: Icons.assignment_rounded,
+                  label: 'Plans',
                 ),
               ],
             ),

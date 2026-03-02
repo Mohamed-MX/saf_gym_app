@@ -1,77 +1,37 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../models/exercise.dart';
-import '../services/wger_api_service.dart';
-import '../services/workout_generator.dart';
+import '../viewmodels/home_viewmodel.dart';
 import '../widgets/exercise_card.dart';
 import '../widgets/shimmer_loading.dart';
 import '../theme/app_theme.dart';
+import '../services/muscle_wiki_service.dart';
 import 'exercise_detail_screen.dart';
 
-class HomeScreen extends StatefulWidget {
+class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  Widget build(BuildContext context) {
+    return ChangeNotifierProvider(
+      create: (_) => HomeViewModel(),
+      child: const _HomeView(),
+    );
+  }
 }
 
-class _HomeScreenState extends State<HomeScreen> {
-  final WgerApiService _apiService = WgerApiService();
-  final WorkoutGenerator _workoutGenerator = WorkoutGenerator();
-
-  List<Exercise> _exercises = [];
-  bool _isLoading = true;
-  String? _error;
-  late DateTime _today;
-
-  @override
-  void initState() {
-    super.initState();
-    _today = DateTime.now();
-    _loadWorkout();
-  }
-
-  Future<void> _loadWorkout() async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
-
-    try {
-      final exerciseIds = _workoutGenerator.generateDailyWorkout(date: _today);
-      final exercises = await _apiService.getExercisesByIds(exerciseIds);
-
-      if (mounted) {
-        setState(() {
-          _exercises = exercises;
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _error = 'Failed to load workout. Please check your connection.';
-          _isLoading = false;
-        });
-      }
-    }
-  }
-
-  String _getFormattedDate() {
-    const months = [
-      'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December',
-    ];
-    return '${months[_today.month - 1]} ${_today.day}, ${_today.year}';
-  }
+class _HomeView extends StatelessWidget {
+  const _HomeView();
 
   @override
   Widget build(BuildContext context) {
+    final vm = context.watch<HomeViewModel>();
+
     return Scaffold(
       backgroundColor: AppTheme.offWhite,
       body: RefreshIndicator(
         color: AppTheme.primaryBlue,
-        onRefresh: _loadWorkout,
+        onRefresh: () => context.read<HomeViewModel>().loadWorkout(),
         child: CustomScrollView(
           slivers: [
             // ── App Bar ──
@@ -92,7 +52,6 @@ class _HomeScreenState extends State<HomeScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Header row with logo
                           Row(
                             children: [
                               Container(
@@ -123,9 +82,8 @@ class _HomeScreenState extends State<HomeScreen> {
                             ],
                           ),
                           const SizedBox(height: 20),
-                          // Day and date
                           Text(
-                            _getFormattedDate(),
+                            vm.formattedDate,
                             style: TextStyle(
                               fontSize: 14,
                               color: AppTheme.white.withValues(alpha: 0.7),
@@ -134,7 +92,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            WorkoutGenerator.getDayLabel(_today),
+                            MuscleWikiService.getDayLabel(vm.today),
                             style: GoogleFonts.outfit(
                               fontSize: 32,
                               fontWeight: FontWeight.w800,
@@ -153,7 +111,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   BorderRadius.circular(AppTheme.radiusFull),
                             ),
                             child: Text(
-                              WorkoutGenerator.getDayFocus(_today),
+                              MuscleWikiService.getDayFocus(vm.today),
                               style: const TextStyle(
                                 color: AppTheme.white,
                                 fontSize: 14,
@@ -189,7 +147,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          '${_exercises.length} exercises • ~45 min',
+                          '${vm.exercises.length} exercises • ~45 min',
                           style: TextStyle(
                             fontSize: 13,
                             color: AppTheme.mediumGrey,
@@ -197,13 +155,12 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ],
                     ),
-                    // Refresh button
                     Material(
                       color: AppTheme.primaryBlue.withValues(alpha: 0.1),
-                      borderRadius:
-                          BorderRadius.circular(AppTheme.radiusFull),
+                      borderRadius: BorderRadius.circular(AppTheme.radiusFull),
                       child: InkWell(
-                        onTap: _loadWorkout,
+                        onTap: () =>
+                            context.read<HomeViewModel>().loadWorkout(),
                         borderRadius:
                             BorderRadius.circular(AppTheme.radiusFull),
                         child: const Padding(
@@ -222,7 +179,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
 
             // ── Exercise List ──
-            if (_isLoading)
+            if (vm.isLoading)
               SliverPadding(
                 padding: const EdgeInsets.symmetric(horizontal: 24),
                 sliver: SliverList(
@@ -232,7 +189,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
               )
-            else if (_error != null)
+            else if (vm.error != null)
               SliverFillRemaining(
                 child: Center(
                   child: Padding(
@@ -240,23 +197,24 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(
+                        const Icon(
                           Icons.cloud_off_rounded,
                           size: 64,
                           color: AppTheme.mediumGrey,
                         ),
                         const SizedBox(height: 16),
                         Text(
-                          _error!,
+                          vm.error!,
                           textAlign: TextAlign.center,
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontSize: 16,
                             color: AppTheme.darkGrey,
                           ),
                         ),
                         const SizedBox(height: 24),
                         ElevatedButton.icon(
-                          onPressed: _loadWorkout,
+                          onPressed: () =>
+                              context.read<HomeViewModel>().loadWorkout(),
                           icon: const Icon(Icons.refresh),
                           label: const Text('Retry'),
                         ),
@@ -267,36 +225,30 @@ class _HomeScreenState extends State<HomeScreen> {
               )
             else
               SliverPadding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 24, vertical: 8),
                 sliver: SliverList(
                   delegate: SliverChildBuilderDelegate(
                     (context, index) {
-                      final exercise = _exercises[index];
+                      final exercise = vm.exercises[index];
                       return ExerciseCard(
                         exercise: exercise,
                         index: index,
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => ExerciseDetailScreen(
-                                exercise: exercise,
-                              ),
-                            ),
-                          );
-                        },
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) =>
+                                ExerciseDetailScreen(exercise: exercise),
+                          ),
+                        ),
                       );
                     },
-                    childCount: _exercises.length,
+                    childCount: vm.exercises.length,
                   ),
                 ),
               ),
 
-            // Bottom padding
-            const SliverToBoxAdapter(
-              child: SizedBox(height: 100),
-            ),
+            const SliverToBoxAdapter(child: SizedBox(height: 100)),
           ],
         ),
       ),

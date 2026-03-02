@@ -1,170 +1,157 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../models/exercise.dart';
-import '../services/wger_api_service.dart';
+import '../services/muscle_wiki_service.dart';
+import '../viewmodels/categories_viewmodel.dart';
+import '../viewmodels/category_exercises_viewmodel.dart';
 import '../widgets/category_card.dart';
 import '../widgets/exercise_card.dart';
 import '../widgets/shimmer_loading.dart';
 import '../theme/app_theme.dart';
 import 'exercise_detail_screen.dart';
+import 'muscle_selection_screen.dart';
 
-class CategoriesScreen extends StatefulWidget {
+class CategoriesScreen extends StatelessWidget {
   const CategoriesScreen({super.key});
 
   @override
-  State<CategoriesScreen> createState() => _CategoriesScreenState();
-}
-
-class _CategoriesScreenState extends State<CategoriesScreen> {
-  final WgerApiService _apiService = WgerApiService();
-  List<ExerciseCategory> _categories = [];
-  bool _isLoading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadCategories();
-  }
-
-  Future<void> _loadCategories() async {
-    try {
-      final categories = await _apiService.getCategories();
-      if (mounted) {
-        setState(() {
-          _categories = categories;
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
-    }
-  }
-
-  void _openCategory(ExerciseCategory category) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => CategoryExercisesScreen(category: category),
-      ),
+  Widget build(BuildContext context) {
+    return ChangeNotifierProvider(
+      create: (_) => CategoriesViewModel(),
+      child: const _CategoriesView(),
     );
   }
+}
+
+class _CategoriesView extends StatelessWidget {
+  const _CategoriesView();
 
   @override
   Widget build(BuildContext context) {
+    final vm = context.watch<CategoriesViewModel>();
+
     return Scaffold(
       backgroundColor: AppTheme.offWhite,
       appBar: AppBar(
         title: Text(
           'Categories',
-          style: GoogleFonts.outfit(
-            fontWeight: FontWeight.w700,
-          ),
+          style: GoogleFonts.outfit(fontWeight: FontWeight.w700),
         ),
         centerTitle: false,
         backgroundColor: AppTheme.offWhite,
         elevation: 0,
-      ),
-      body: _isLoading
-          ? const Center(
-              child: CircularProgressIndicator(color: AppTheme.primaryBlue),
-            )
-          : Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Browse by muscle group',
-                    style: TextStyle(
-                      fontSize: 15,
-                      color: AppTheme.mediumGrey,
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  Expanded(
-                    child: GridView.builder(
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2,
-                        crossAxisSpacing: 16,
-                        mainAxisSpacing: 16,
-                        childAspectRatio: 1.1,
-                      ),
-                      itemCount: _categories.length,
-                      itemBuilder: (context, index) {
-                        final category = _categories[index];
-                        return CategoryCard(
-                          name: category.name,
-                          icon: CategoryCard.getCategoryIcon(category.name),
-                          onTap: () => _openCategory(category),
-                        );
-                      },
-                    ),
-                  ),
-                ],
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: ElevatedButton.icon(
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const MuscleSelectionScreen(),
+                ),
+              ),
+              icon: const Icon(Icons.accessibility_new_rounded, size: 18),
+              label: Text(
+                'Muscle Map',
+                style: GoogleFonts.outfit(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primaryBlue,
+                foregroundColor: AppTheme.white,
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 14, vertical: 8),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                shape: RoundedRectangleBorder(
+                  borderRadius:
+                      BorderRadius.circular(AppTheme.radiusFull),
+                ),
               ),
             ),
+          ),
+        ],
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Browse by muscle group',
+              style: TextStyle(
+                fontSize: 15,
+                color: AppTheme.mediumGrey,
+              ),
+            ),
+            const SizedBox(height: 20),
+            Expanded(
+              child: GridView.builder(
+                gridDelegate:
+                    const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  crossAxisSpacing: 16,
+                  mainAxisSpacing: 16,
+                  childAspectRatio: 1.1,
+                ),
+                itemCount: vm.categories.length,
+                itemBuilder: (context, index) {
+                  final category = vm.categories[index];
+                  return CategoryCard(
+                    name: category.displayName,
+                    icon: category.icon,
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => CategoryExercisesScreen(
+                          category: category,
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
 
-/// Screen that displays exercises filtered by category
-class CategoryExercisesScreen extends StatefulWidget {
-  final ExerciseCategory category;
+// ── Category exercises screen ──────────────────────────────────────────────
+
+class CategoryExercisesScreen extends StatelessWidget {
+  final MuscleCategory category;
 
   const CategoryExercisesScreen({super.key, required this.category});
 
   @override
-  State<CategoryExercisesScreen> createState() =>
-      _CategoryExercisesScreenState();
+  Widget build(BuildContext context) {
+    return ChangeNotifierProvider(
+      create: (_) =>
+          CategoryExercisesViewModel()..loadExercises(category.muscleName),
+      child: _CategoryExercisesView(category: category),
+    );
+  }
 }
 
-class _CategoryExercisesScreenState extends State<CategoryExercisesScreen> {
-  final WgerApiService _apiService = WgerApiService();
-  List<Exercise> _exercises = [];
-  bool _isLoading = true;
-  String? _error;
+class _CategoryExercisesView extends StatelessWidget {
+  final MuscleCategory category;
 
-  @override
-  void initState() {
-    super.initState();
-    _loadExercises();
-  }
-
-  Future<void> _loadExercises() async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
-
-    try {
-      final exercises =
-          await _apiService.getExercisesByCategory(widget.category.id);
-      if (mounted) {
-        setState(() {
-          _exercises = exercises;
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _error = 'Failed to load exercises';
-          _isLoading = false;
-        });
-      }
-    }
-  }
+  const _CategoryExercisesView({required this.category});
 
   @override
   Widget build(BuildContext context) {
+    final vm = context.watch<CategoryExercisesViewModel>();
+
     return Scaffold(
       backgroundColor: AppTheme.offWhite,
       appBar: AppBar(
         title: Text(
-          widget.category.name,
+          category.displayName,
           style: GoogleFonts.outfit(fontWeight: FontWeight.w700),
         ),
         backgroundColor: AppTheme.offWhite,
@@ -174,7 +161,7 @@ class _CategoryExercisesScreenState extends State<CategoryExercisesScreen> {
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      body: _isLoading
+      body: vm.isLoading
           ? Padding(
               padding: const EdgeInsets.all(24),
               child: Column(
@@ -184,7 +171,7 @@ class _CategoryExercisesScreenState extends State<CategoryExercisesScreen> {
                 ),
               ),
             )
-          : _error != null
+          : vm.error != null
               ? Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -192,18 +179,21 @@ class _CategoryExercisesScreenState extends State<CategoryExercisesScreen> {
                       Icon(Icons.error_outline,
                           size: 48, color: AppTheme.mediumGrey),
                       const SizedBox(height: 16),
-                      Text(_error!,
-                          style: TextStyle(color: AppTheme.darkGrey)),
+                      Text(vm.error!,
+                          style: const TextStyle(
+                              color: AppTheme.darkGrey)),
                       const SizedBox(height: 16),
                       ElevatedButton(
-                        onPressed: _loadExercises,
+                        onPressed: () => context
+                            .read<CategoryExercisesViewModel>()
+                            .loadExercises(category.muscleName),
                         child: const Text('Retry'),
                       ),
                     ],
                   ),
                 )
-              : _exercises.isEmpty
-                  ? Center(
+              : vm.exercises.isEmpty
+                  ? const Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
@@ -212,7 +202,7 @@ class _CategoryExercisesScreenState extends State<CategoryExercisesScreen> {
                             size: 64,
                             color: AppTheme.mediumGrey,
                           ),
-                          const SizedBox(height: 16),
+                          SizedBox(height: 16),
                           Text(
                             'No exercises found',
                             style: TextStyle(
@@ -225,24 +215,25 @@ class _CategoryExercisesScreenState extends State<CategoryExercisesScreen> {
                     )
                   : RefreshIndicator(
                       color: AppTheme.primaryBlue,
-                      onRefresh: _loadExercises,
+                      onRefresh: () => context
+                          .read<CategoryExercisesViewModel>()
+                          .loadExercises(category.muscleName),
                       child: ListView.builder(
                         padding: const EdgeInsets.all(24),
-                        itemCount: _exercises.length,
+                        itemCount: vm.exercises.length,
                         itemBuilder: (context, index) {
-                          final exercise = _exercises[index];
+                          final exercise = vm.exercises[index];
                           return ExerciseCard(
                             exercise: exercise,
                             index: index,
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) =>
-                                      ExerciseDetailScreen(exercise: exercise),
-                                ),
-                              );
-                            },
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                    ExerciseDetailScreen(
+                                        exercise: exercise),
+                              ),
+                            ),
                           );
                         },
                       ),
