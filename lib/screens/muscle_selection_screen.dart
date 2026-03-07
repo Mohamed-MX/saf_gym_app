@@ -124,7 +124,7 @@ class _MuscleSelectionViewState extends State<_MuscleSelectionView>
     // Thumb alignment: LEFT when male, RIGHT when female
     final alignment = isMale ? Alignment.centerLeft : Alignment.centerRight;
 
-    final iconChar = isMale ? '♂' : '♀';
+    final iconData = isMale ? Icons.male : Icons.female;
     final iconColor = isMale ? const Color(0xFF4A7FC1) : const Color(0xFFEA6B8A);
 
     return GestureDetector(
@@ -164,14 +164,10 @@ class _MuscleSelectionViewState extends State<_MuscleSelectionView>
               ],
             ),
             child: Center(
-              child: Text(
-                iconChar,
-                style: TextStyle(
-                  fontSize: 18,
-                  color: iconColor,
-                  fontWeight: FontWeight.bold,
-                  height: 1.0,
-                ),
+              child: Icon(
+                iconData,
+                size: 20,
+                color: iconColor,
               ),
             ),
           ),
@@ -599,7 +595,7 @@ class _MuscleSelectionViewState extends State<_MuscleSelectionView>
                     _buildToggleWithLabel(
                       toggle: _buildSimpleToggle(
                         value: vm.isAdvanced,
-                        activeTrackColor: const Color(0xFF808080),
+                        activeTrackColor: const Color(0xFF4A7FC1),
                         onTap: () => context
                             .read<MuscleSelectionViewModel>()
                             .setAdvanced(!vm.isAdvanced),
