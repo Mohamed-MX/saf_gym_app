@@ -104,62 +104,159 @@ class _MuscleSelectionViewState extends State<_MuscleSelectionView>
     super.dispose();
   }
 
-  // ── Build toggle switch ─────────────────────────────────────────────────
-  Widget _buildToggle({
-    required String labelOff,
-    required String labelOn,
-    required bool value,
-    required ValueChanged<bool> onChanged,
+  // ── Gender toggle (Male/Female) with gender icon in thumb ─────────────────
+  // isMale=true → thumb on LEFT, blue background, ♂ icon
+  // isMale=false → thumb on RIGHT, pink background, ♀ icon
+  Widget _buildGenderToggle({
+    required bool isMale,
+    required VoidCallback onTap,
   }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-      decoration: BoxDecoration(
-        color: AppTheme.primaryDark.withValues(alpha: 0.25),
-        borderRadius: BorderRadius.circular(AppTheme.radiusFull),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _toggleOption(label: labelOff, active: !value, onTap: () => onChanged(false)),
-          const SizedBox(width: 2),
-          _toggleOption(label: labelOn, active: value, onTap: () => onChanged(true)),
-        ],
+    // Colors
+    final trackColor = isMale
+        ? const Color(0xFF4A7FC1)  // blue for male
+        : const Color(0xFFEA6B8A); // pink for female
+
+    const double trackW = 72;
+    const double trackH = 38;
+    const double thumbD = 34;
+    const double thumbPad = 2;
+
+    // Thumb alignment: LEFT when male, RIGHT when female
+    final alignment = isMale ? Alignment.centerLeft : Alignment.centerRight;
+
+    final iconChar = isMale ? '♂' : '♀';
+    final iconColor = isMale ? const Color(0xFF4A7FC1) : const Color(0xFFEA6B8A);
+
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 250),
+        width: trackW,
+        height: trackH,
+        padding: const EdgeInsets.all(thumbPad),
+        decoration: BoxDecoration(
+          color: trackColor,
+          borderRadius: BorderRadius.circular(trackH / 2),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.15),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: AnimatedAlign(
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeInOut,
+          alignment: alignment,
+          child: Container(
+            width: thumbD,
+            height: thumbD,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.15),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Center(
+              child: Text(
+                iconChar,
+                style: TextStyle(
+                  fontSize: 18,
+                  color: iconColor,
+                  fontWeight: FontWeight.bold,
+                  height: 1.0,
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
 
-  Widget _toggleOption({
-    required String label,
-    required bool active,
+  // ── Simple gray toggle (no icon) ────────────────────────────────────────
+  // value=false → thumb LEFT, gray track
+  // value=true  → thumb RIGHT, blue track
+  Widget _buildSimpleToggle({
+    required bool value,
+    required Color activeTrackColor,
     required VoidCallback onTap,
   }) {
+    const double trackW = 72;
+    const double trackH = 38;
+    const double thumbD = 34;
+    const double thumbPad = 2;
+
+    final trackColor = value ? activeTrackColor : const Color(0xFF808080);
+    final alignment = value ? Alignment.centerRight : Alignment.centerLeft;
+
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        duration: const Duration(milliseconds: 250),
+        width: trackW,
+        height: trackH,
+        padding: const EdgeInsets.all(thumbPad),
         decoration: BoxDecoration(
-          color: active ? AppTheme.white : Colors.transparent,
-          borderRadius: BorderRadius.circular(AppTheme.radiusFull),
-          boxShadow: active
-              ? [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.12),
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
-                  ),
-                ]
-              : null,
+          color: trackColor,
+          borderRadius: BorderRadius.circular(trackH / 2),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.15),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
-        child: Text(
-          label,
-          style: GoogleFonts.outfit(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: active ? AppTheme.primaryBlue : AppTheme.white.withValues(alpha: 0.85),
+        child: AnimatedAlign(
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeInOut,
+          alignment: alignment,
+          child: Container(
+            width: thumbD,
+            height: thumbD,
+            decoration: BoxDecoration(
+              color: const Color(0xFFF0F0F0),
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.15),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
           ),
         ),
       ),
+    );
+  }
+
+  // ── Toggle + label column ────────────────────────────────────────────────
+  Widget _buildToggleWithLabel({
+    required Widget toggle,
+    required String label,
+  }) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        toggle,
+        const SizedBox(height: 6),
+        Text(
+          label,
+          style: GoogleFonts.outfit(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: Colors.white,
+          ),
+        ),
+      ],
     );
   }
 
@@ -446,6 +543,13 @@ class _MuscleSelectionViewState extends State<_MuscleSelectionView>
   Widget build(BuildContext context) {
     final vm = context.watch<MuscleSelectionViewModel>();
 
+    // Determine label for gender toggle: "Male" when isMale, "Female" when not
+    final genderLabel = vm.isMale ? 'Male' : 'Female';
+    // Determine label for view toggle: "Front" when isFront, "Back" when not
+    final viewLabel = vm.isFront ? 'Front' : 'Back';
+    // Determine label for type toggle
+    final typeLabel = vm.isAdvanced ? 'Advanced' : 'Simple';
+
     return Scaffold(
       backgroundColor: AppTheme.offWhite,
       body: NestedScrollView(
@@ -472,33 +576,47 @@ class _MuscleSelectionViewState extends State<_MuscleSelectionView>
             ),
             centerTitle: true,
             bottom: PreferredSize(
-              preferredSize: const Size.fromHeight(56),
+              preferredSize: const Size.fromHeight(76),
               child: Container(
                 color: AppTheme.primaryBlue,
-                padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 14),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    _buildToggle(
-                      labelOff: '♀ Female',
-                      labelOn: '♂ Male',
-                      value: vm.isMale,
-                      onChanged: (v) =>
-                          context.read<MuscleSelectionViewModel>().setGender(v),
+                    // ── Gender Toggle ──
+                    _buildToggleWithLabel(
+                      toggle: _buildGenderToggle(
+                        isMale: vm.isMale,
+                        onTap: () => context
+                            .read<MuscleSelectionViewModel>()
+                            .setGender(!vm.isMale),
+                      ),
+                      label: genderLabel,
                     ),
-                    _buildToggle(
-                      labelOff: 'Simple',
-                      labelOn: 'Advanced',
-                      value: vm.isAdvanced,
-                      onChanged: (v) =>
-                          context.read<MuscleSelectionViewModel>().setAdvanced(v),
+
+                    // ── Simple / Advanced Toggle ──
+                    _buildToggleWithLabel(
+                      toggle: _buildSimpleToggle(
+                        value: vm.isAdvanced,
+                        activeTrackColor: const Color(0xFF808080),
+                        onTap: () => context
+                            .read<MuscleSelectionViewModel>()
+                            .setAdvanced(!vm.isAdvanced),
+                      ),
+                      label: typeLabel,
                     ),
-                    _buildToggle(
-                      labelOff: 'Front',
-                      labelOn: 'Back',
-                      value: !vm.isFront,
-                      onChanged: (v) =>
-                          context.read<MuscleSelectionViewModel>().setFront(!v),
+
+                    // ── Front / Back Toggle ──
+                    _buildToggleWithLabel(
+                      toggle: _buildSimpleToggle(
+                        value: !vm.isFront,
+                        activeTrackColor: const Color(0xFF4A7FC1),
+                        onTap: () => context
+                            .read<MuscleSelectionViewModel>()
+                            .setFront(!vm.isFront),
+                      ),
+                      label: viewLabel,
                     ),
                   ],
                 ),
@@ -510,10 +628,10 @@ class _MuscleSelectionViewState extends State<_MuscleSelectionView>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // ── Body map ────────────────────────────────────────────────
+              // ── Body map on WHITE background ────────────────────────────
               Container(
-                color: AppTheme.primaryBlue,
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                color: Colors.white,
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
                 child: Center(
                   child: SizedBox(
                     height: 420,
