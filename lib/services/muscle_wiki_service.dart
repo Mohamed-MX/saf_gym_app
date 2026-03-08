@@ -29,10 +29,12 @@ class MuscleWikiExercise {
   final List<String> steps;
   /// thumbnail image URL from the first video's og_image
   final String? thumbnailUrl;
-  /// video URL from the first male-front video
+  /// video URL from the first male-front video (backward-compat for list cards)
   final String? gifUrl;
   /// Muscle slug this exercise was fetched under (for display badges)
   final String? muscleSlug;
+  /// All videos from the API: each map has keys url, og_image, gender, angle
+  final List<Map<String, String?>> videos;
 
   MuscleWikiExercise({
     required this.id,
@@ -44,6 +46,7 @@ class MuscleWikiExercise {
     this.thumbnailUrl,
     this.gifUrl,
     this.muscleSlug,
+    this.videos = const [],
   });
 
   String? get displayImageUrl => thumbnailUrl ?? gifUrl;
@@ -64,19 +67,28 @@ class MuscleWikiExercise {
             .toList() ??
         [];
 
-    // Pull first male-front video for preview, fall back to first video
+    // Build the full videos list
+    final rawVideos = json['videos'] as List<dynamic>? ?? [];
+    final allVideos = rawVideos.map((v) {
+      final m = v as Map<String, dynamic>;
+      return <String, String?>{
+        'url': m['url'] as String?,
+        'og_image': m['og_image'] as String?,
+        'gender': m['gender'] as String?,
+        'angle': m['angle'] as String?,
+      };
+    }).toList();
+
+    // Pull first male-front video for backward-compat preview fields
     String? gifUrl;
     String? thumbnailUrl;
-    final videos = json['videos'] as List<dynamic>?;
-    if (videos != null && videos.isNotEmpty) {
-      // prefer male front
-      final maleFront = videos.firstWhere(
-        (v) =>
-            v['gender'] == 'male' && v['angle'] == 'front',
-        orElse: () => videos.first,
+    if (allVideos.isNotEmpty) {
+      final maleFront = allVideos.firstWhere(
+        (v) => v['gender'] == 'male' && v['angle'] == 'front',
+        orElse: () => allVideos.first,
       );
-      gifUrl = maleFront['url'] as String?;
-      thumbnailUrl = maleFront['og_image'] as String?;
+      gifUrl = maleFront['url'];
+      thumbnailUrl = maleFront['og_image'];
     }
 
     return MuscleWikiExercise(
@@ -89,6 +101,7 @@ class MuscleWikiExercise {
       thumbnailUrl: thumbnailUrl,
       gifUrl: gifUrl,
       muscleSlug: json['_muscleSlug'] as String?,
+      videos: allVideos,
     );
   }
 
@@ -102,16 +115,7 @@ class MuscleWikiExercise {
         if (thumbnailUrl != null) 'og_image': thumbnailUrl,
         if (gifUrl != null) 'url': gifUrl,
         if (muscleSlug != null) '_muscleSlug': muscleSlug,
-        // Wrap back into the videos list format so fromJson can re-parse
-        if (gifUrl != null || thumbnailUrl != null)
-          'videos': [
-            {
-              'url': gifUrl,
-              'og_image': thumbnailUrl,
-              'gender': 'male',
-              'angle': 'front',
-            }
-          ],
+        'videos': videos,
       };
 
   MuscleWikiExercise withSlug(String slug) => MuscleWikiExercise(
@@ -124,6 +128,7 @@ class MuscleWikiExercise {
         thumbnailUrl: thumbnailUrl,
         gifUrl: gifUrl,
         muscleSlug: slug,
+        videos: videos,
       );
 }
 
@@ -205,19 +210,18 @@ class MuscleWikiService {
 
   List<MuscleCategory> getMuscleCategories() => _allCategories;
 
-  /// Fetch exercises by muscle name (uses the API's exact capitalized name)
+  /// Fetch exercises by muscle name (uses the API's exact capitalized name).
+  /// NOTE: The list endpoint returns ONLY id & name. Call getExerciseById for
+  /// full data (videos, steps, etc.)
   Future<List<MuscleWikiExercise>> getExercisesByMuscle({
     required String muscle,
     int limit = 20,
   }) async {
-    // `muscle` may be our internal slug or the API's display name
     final apiMuscle = muscleSlugMap[muscle] ?? muscle;
-
     final uri = Uri.parse('$_baseUrl/exercises').replace(
       queryParameters: {
         'muscles': apiMuscle,
         'limit': '$limit',
-        'detail': 'true',
       },
     );
 
@@ -237,6 +241,29 @@ class MuscleWikiService {
       }
     } catch (_) {}
     return [];
+  }
+
+  /// Fetch the FULL exercise details (videos, steps, categories, etc.)
+  /// from the individual endpoint /exercises/{id}.
+  ///
+  /// This is the ONLY endpoint that returns videos and steps.
+  Future<MuscleWikiExercise?> getExerciseById(
+    int id, {
+    String? muscleSlug,
+  }) async {
+    try {
+      final uri = Uri.parse('$_baseUrl/exercises/$id');
+      final resp =
+          await http.get(uri, headers: _headers).timeout(
+        const Duration(seconds: 15),
+      );
+      if (resp.statusCode == 200) {
+        final data = jsonDecode(resp.body) as Map<String, dynamic>;
+        final ex = MuscleWikiExercise.fromJson(data);
+        return muscleSlug != null ? ex.withSlug(muscleSlug) : ex;
+      }
+    } catch (_) {}
+    return null;
   }
 
   /// Daily workout: picks 3 muscle groups seeded by date → ≤9 exercises
