@@ -46,6 +46,7 @@ dependencies:
   sqflite: ^2.4.2
   path: ^1.9.1
   video_player: ^2.9.2
+  flutter_dotenv: ^5.2.1
 
 dev_dependencies:
   flutter_test:
@@ -74,6 +75,7 @@ flutter:
     - assets/SVGs/
     - assets/icon.png
     - assets/logo.png
+    - .env
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

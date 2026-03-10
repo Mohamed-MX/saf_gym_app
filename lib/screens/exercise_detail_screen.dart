@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:video_player/video_player.dart';
 import '../blocs/exercise_detail_bloc.dart';
+import '../config/app_config.dart';
 import '../services/muscle_wiki_service.dart';
 import '../theme/app_theme.dart';
 
@@ -24,9 +25,8 @@ class ExerciseDetailScreen extends StatelessWidget {
 // ── Video page widget (manages its own VideoPlayerController) ──────────────
 
 // MuscleWiki requires the API key even for media (images & videos)
-const Map<String, String> _apiHeaders = {
-  'X-API-Key': 'REDACTED_KEY',
-};
+// Key is loaded from .env at startup via AppConfig — never hardcoded.
+Map<String, String> get _apiHeaders => AppConfig.mediaHeaders;
 
 class _VideoPage extends StatefulWidget {
   final String? videoUrl;

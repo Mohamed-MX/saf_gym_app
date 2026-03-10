@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import '../config/app_config.dart';
 
 // ── MuscleCategory ─────────────────────────────────────────────────────────
 
@@ -136,13 +137,8 @@ class MuscleWikiExercise {
 
 class MuscleWikiService {
   static const String _baseUrl = 'https://api.musclewiki.com';
-  static const String _apiKey =
-      'REDACTED_KEY';
 
-  static const Map<String, String> _headers = {
-    'X-API-Key': _apiKey,
-    'Content-Type': 'application/json',
-  };
+  static Map<String, String> get _headers => AppConfig.apiHeaders;
 
   // ── Muscle name → API query value (capitalized as the API expects) ──────
   static const Map<String, String> muscleSlugMap = {
