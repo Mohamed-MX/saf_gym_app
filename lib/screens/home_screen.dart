@@ -2,19 +2,24 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../viewmodels/home_viewmodel.dart';
-import '../widgets/exercise_card.dart';
-import '../widgets/shimmer_loading.dart';
+import '../viewmodels/workout_plans_viewmodel.dart';
+import '../models/workout_plan.dart';
 import '../theme/app_theme.dart';
 import '../services/muscle_wiki_service.dart';
-import 'exercise_detail_screen.dart';
+import 'muscle_selection_screen.dart';
+import 'workout_plan_editor_screen.dart';
+import 'workout_plans_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => HomeViewModel(),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => HomeViewModel()),
+        ChangeNotifierProvider(create: (_) => WorkoutPlansViewModel()),
+      ],
       child: const _HomeView(),
     );
   }
@@ -26,232 +31,598 @@ class _HomeView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final vm = context.watch<HomeViewModel>();
+    final plansVm = context.watch<WorkoutPlansViewModel>();
+
+    // Find today's workout day from plans
+    final todayName = MuscleWikiService.getDayLabel(vm.today);
+    WorkoutDay? todayWorkout;
+    WorkoutPlan? todayPlan;
+    for (final plan in plansVm.plans) {
+      for (final day in plan.days) {
+        if (day.dayName == todayName && day.exercises.isNotEmpty) {
+          todayWorkout = day;
+          todayPlan = plan;
+          break;
+        }
+      }
+      if (todayWorkout != null) break;
+    }
 
     return Scaffold(
       backgroundColor: AppTheme.offWhite,
-      body: RefreshIndicator(
-        color: AppTheme.primaryBlue,
-        onRefresh: () => context.read<HomeViewModel>().loadWorkout(),
-        child: CustomScrollView(
-          slivers: [
-            // ── App Bar ──
-            SliverAppBar(
-              expandedHeight: 220,
-              floating: false,
-              pinned: true,
-              elevation: 0,
-              backgroundColor: AppTheme.primaryBlue,
-              flexibleSpace: FlexibleSpaceBar(
-                background: Container(
-                  decoration: const BoxDecoration(
-                    gradient: AppTheme.heroGradient,
+      body: CustomScrollView(
+        slivers: [
+          // ── Blue Header ──────────────────────────────────────────────────
+          SliverToBoxAdapter(
+            child: _HomeHeader(vm: vm),
+          ),
+
+          // ── Action Cards ─────────────────────────────────────────────────
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Create Your Own Workout (blue card)
+                  _CreateWorkoutCard(
+                    onTap: () async {
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const WorkoutPlanEditorScreen(),
+                        ),
+                      );
+                      if (context.mounted) {
+                        context.read<WorkoutPlansViewModel>().loadPlans();
+                      }
+                    },
                   ),
-                  child: SafeArea(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                width: 44,
-                                height: 44,
-                                decoration: BoxDecoration(
-                                  color: AppTheme.white,
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(12),
-                                  child: Image.asset(
-                                    'assets/icon.png',
-                                    fit: BoxFit.contain,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Text(
-                                'SAF',
-                                style: GoogleFonts.outfit(
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.w800,
-                                  color: AppTheme.white,
-                                  letterSpacing: 2,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 20),
-                          Text(
-                            vm.formattedDate,
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: AppTheme.white.withValues(alpha: 0.7),
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            MuscleWikiService.getDayLabel(vm.today),
-                            style: GoogleFonts.outfit(
-                              fontSize: 32,
-                              fontWeight: FontWeight.w800,
-                              color: AppTheme.white,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 6,
-                            ),
-                            decoration: BoxDecoration(
-                              color: AppTheme.white.withValues(alpha: 0.2),
-                              borderRadius:
-                                  BorderRadius.circular(AppTheme.radiusFull),
-                            ),
-                            child: Text(
-                              MuscleWikiService.getDayFocus(vm.today),
-                              style: const TextStyle(
-                                color: AppTheme.white,
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
+                  const SizedBox(height: 14),
+
+                  // AI Workout Plan
+                  _ActionCard(
+                    icon: Icons.auto_awesome,
+                    iconColor: AppTheme.primaryBlue,
+                    title: 'AI Workout Plan',
+                    subtitle: 'Customize your training',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const MuscleSelectionScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Performance Dashboard
+                  _ActionCard(
+                    icon: Icons.bar_chart_rounded,
+                    iconColor: AppTheme.primaryBlue,
+                    title: 'Performance Dashboard',
+                    subtitle: 'View your progress',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const WorkoutPlansScreen(),
+                        ),
+                      );
+                    },
+                  ),
+
+                  const SizedBox(height: 28),
+
+                  // ── Today's Plan ─────────────────────────────────────────
+                  Text(
+                    "Today's Plan",
+                    style: GoogleFonts.outfit(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                      color: AppTheme.charcoal,
                     ),
                   ),
-                ),
+                  const SizedBox(height: 12),
+                  _TodaysPlanCard(
+                    todayName: todayName,
+                    planName: todayPlan?.name,
+                    todayWorkout: todayWorkout,
+                    isLoadingPlans: plansVm.isLoading,
+                    onStart: () {
+                      if (todayPlan != null) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => WorkoutPlanEditorScreen(
+                              existingPlan: todayPlan,
+                            ),
+                          ),
+                        );
+                      } else {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const WorkoutPlanEditorScreen(),
+                          ),
+                        );
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 100),
+                ],
               ),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
-            // ── Section Header ──
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Column(
+// ── Header Widget ─────────────────────────────────────────────────────────────
+
+class _HomeHeader extends StatelessWidget {
+  final HomeViewModel vm;
+  const _HomeHeader({required this.vm});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [AppTheme.primaryBlue, Color(0xFF0A6DD4)],
+        ),
+        borderRadius: BorderRadius.only(
+          bottomLeft: Radius.circular(28),
+          bottomRight: Radius.circular(28),
+        ),
+      ),
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 20, 24, 28),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Top row: title + profile
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Workout of the Day',
+                          "Let's Move Today",
                           style: GoogleFonts.outfit(
-                            fontSize: 22,
-                            fontWeight: FontWeight.w700,
-                            color: AppTheme.charcoal,
+                            fontSize: 26,
+                            fontWeight: FontWeight.w800,
+                            color: AppTheme.white,
                           ),
                         ),
-                        const SizedBox(height: 2),
+                        const SizedBox(height: 4),
                         Text(
-                          '${vm.exercises.length} exercises • ~45 min',
+                          'Ready to crush your goals?',
                           style: TextStyle(
-                            fontSize: 13,
-                            color: AppTheme.mediumGrey,
+                            fontSize: 14,
+                            color: AppTheme.white.withValues(alpha: 0.8),
+                            fontWeight: FontWeight.w400,
                           ),
                         ),
                       ],
                     ),
-                    Material(
-                      color: AppTheme.primaryBlue.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(AppTheme.radiusFull),
-                      child: InkWell(
-                        onTap: () =>
-                            context.read<HomeViewModel>().loadWorkout(),
-                        borderRadius:
-                            BorderRadius.circular(AppTheme.radiusFull),
-                        child: const Padding(
-                          padding: EdgeInsets.all(10),
-                          child: Icon(
-                            Icons.refresh_rounded,
-                            color: AppTheme.primaryBlue,
-                            size: 22,
-                          ),
+                  ),
+                  // Profile avatar button
+                  GestureDetector(
+                    onTap: () {
+                      // Profile action placeholder
+                    },
+                    child: Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: AppTheme.charcoal,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: AppTheme.white.withValues(alpha: 0.3),
+                          width: 2,
                         ),
+                      ),
+                      child: const Icon(
+                        Icons.person_rounded,
+                        color: AppTheme.white,
+                        size: 26,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 20),
+
+              // Stats row
+              Row(
+                children: [
+                  _StatCard(
+                    icon: Icons.local_fire_department_rounded,
+                    iconColor: Colors.redAccent,
+                    value: '7',
+                    label: 'Day streak',
+                  ),
+                  const SizedBox(width: 12),
+                  _StatCard(
+                    icon: Icons.fitness_center_rounded,
+                    iconColor: AppTheme.charcoal,
+                    value: '900',
+                    label: 'Total Reps',
+                  ),
+                  const SizedBox(width: 12),
+                  _StatCard(
+                    icon: Icons.timer_rounded,
+                    iconColor: AppTheme.primaryBlue,
+                    value: '5k',
+                    label: 'Minutes',
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Stat Card ─────────────────────────────────────────────────────────────────
+
+class _StatCard extends StatelessWidget {
+  final IconData icon;
+  final Color iconColor;
+  final String value;
+  final String label;
+
+  const _StatCard({
+    required this.icon,
+    required this.iconColor,
+    required this.value,
+    required this.label,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+        decoration: BoxDecoration(
+          color: AppTheme.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.08),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          children: [
+            Icon(icon, color: iconColor, size: 22),
+            const SizedBox(height: 6),
+            Text(
+              value,
+              style: GoogleFonts.outfit(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                color: AppTheme.charcoal,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 11,
+                color: AppTheme.mediumGrey,
+                fontWeight: FontWeight.w500,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Create Workout Card (blue) ────────────────────────────────────────────────
+
+class _CreateWorkoutCard extends StatelessWidget {
+  final VoidCallback onTap;
+  const _CreateWorkoutCard({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppTheme.primaryBlue,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        splashColor: Colors.white.withValues(alpha: 0.1),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
+          child: Row(
+            children: [
+              // Plus circle
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: AppTheme.white.withValues(alpha: 0.2),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.add_rounded, color: AppTheme.white, size: 28),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Create Your Own Workout',
+                      style: GoogleFonts.outfit(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.white,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Build a Custom routine',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: AppTheme.white.withValues(alpha: 0.8),
                       ),
                     ),
                   ],
                 ),
               ),
-            ),
-
-            // ── Exercise List ──
-            if (vm.isLoading)
-              SliverPadding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                sliver: SliverList(
-                  delegate: SliverChildBuilderDelegate(
-                    (context, index) => const ExerciseCardShimmer(),
-                    childCount: 6,
-                  ),
-                ),
-              )
-            else if (vm.error != null)
-              SliverFillRemaining(
-                child: Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(32),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(
-                          Icons.cloud_off_rounded,
-                          size: 64,
-                          color: AppTheme.mediumGrey,
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          vm.error!,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            color: AppTheme.darkGrey,
-                          ),
-                        ),
-                        const SizedBox(height: 24),
-                        ElevatedButton.icon(
-                          onPressed: () =>
-                              context.read<HomeViewModel>().loadWorkout(),
-                          icon: const Icon(Icons.refresh),
-                          label: const Text('Retry'),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              )
-            else
-              SliverPadding(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 24, vertical: 8),
-                sliver: SliverList(
-                  delegate: SliverChildBuilderDelegate(
-                    (context, index) {
-                      final exercise = vm.exercises[index];
-                      return ExerciseCard(
-                        exercise: exercise,
-                        index: index,
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) =>
-                                ExerciseDetailScreen(exercise: exercise),
-                          ),
-                        ),
-                      );
-                    },
-                    childCount: vm.exercises.length,
-                  ),
-                ),
-              ),
-
-            const SliverToBoxAdapter(child: SizedBox(height: 100)),
-          ],
+              const Icon(Icons.chevron_right_rounded, color: AppTheme.white, size: 26),
+            ],
+          ),
         ),
       ),
+    );
+  }
+}
+
+// ── Action Card (white) ───────────────────────────────────────────────────────
+
+class _ActionCard extends StatelessWidget {
+  final IconData icon;
+  final Color iconColor;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  const _ActionCard({
+    required this.icon,
+    required this.iconColor,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppTheme.white,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
+            child: Row(
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: iconColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(icon, color: iconColor, size: 26),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: GoogleFonts.outfit(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.charcoal,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: AppTheme.mediumGrey,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(Icons.chevron_right_rounded, color: AppTheme.mediumGrey, size: 26),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Today's Plan Card ─────────────────────────────────────────────────────────
+
+class _TodaysPlanCard extends StatelessWidget {
+  final String todayName;
+  final String? planName;
+  final WorkoutDay? todayWorkout;
+  final bool isLoadingPlans;
+  final VoidCallback onStart;
+
+  const _TodaysPlanCard({
+    required this.todayName,
+    required this.planName,
+    required this.todayWorkout,
+    required this.isLoadingPlans,
+    required this.onStart,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppTheme.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.06),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: isLoadingPlans
+            ? const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(16),
+                  child: CircularProgressIndicator(color: AppTheme.primaryBlue),
+                ),
+              )
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Day row + play button
+                  Row(
+                    children: [
+                      Text(
+                        planName != null ? '$planName — $todayName' : todayName,
+                        style: GoogleFonts.outfit(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          color: AppTheme.charcoal,
+                        ),
+                      ),
+                      const Spacer(),
+                      // Play / Start button
+                      GestureDetector(
+                        onTap: onStart,
+                        child: Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: AppTheme.primaryBlue,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppTheme.primaryBlue.withValues(alpha: 0.4),
+                                blurRadius: 12,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: const Icon(
+                            Icons.play_arrow_rounded,
+                            color: AppTheme.white,
+                            size: 26,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // Exercise list
+                  if (todayWorkout == null || todayWorkout!.exercises.isEmpty)
+                    _buildEmpty(context)
+                  else
+                    ...todayWorkout!.exercises.take(5).map(
+                          (ex) => Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: Text(
+                              '${ex.name} — ${ex.sets} sets × ${ex.reps} reps',
+                              style: const TextStyle(
+                                fontSize: 14,
+                                color: AppTheme.darkGrey,
+                                fontWeight: FontWeight.w400,
+                              ),
+                            ),
+                          ),
+                        ),
+
+                  if ((todayWorkout?.exercises.length ?? 0) > 5)
+                    Text(
+                      '+ ${todayWorkout!.exercises.length - 5} more exercises',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: AppTheme.primaryBlue,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                ],
+              ),
+      ),
+    );
+  }
+
+  Widget _buildEmpty(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'No workout planned for today.',
+          style: TextStyle(
+            fontSize: 14,
+            color: AppTheme.mediumGrey,
+          ),
+        ),
+        const SizedBox(height: 10),
+        GestureDetector(
+          onTap: onStart,
+          child: Text(
+            'Tap ▶ to create one now',
+            style: TextStyle(
+              fontSize: 14,
+              color: AppTheme.primaryBlue,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
