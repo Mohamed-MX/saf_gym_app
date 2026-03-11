@@ -1,6 +1,9 @@
 # saf_gym_app
 
-A new Flutter project.
+Saf is a gym companion app built with flutter 
+main fetures : 
+-build workout plan and keep track of your progress
+-connect with a wearable device
 
 ## Getting Started
 
