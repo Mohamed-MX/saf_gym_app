@@ -1,4 +1,4 @@
-# saf_gym_app
+# Saf Gym App
 
 Saf is a gym companion app built with flutter 
 # main fetures : 
