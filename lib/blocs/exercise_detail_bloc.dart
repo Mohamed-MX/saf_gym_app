@@ -1,21 +1,18 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../services/muscle_wiki_service.dart';
-import '../services/favorites_service.dart';
-import '../services/exercise_cache_db.dart';
+import '../services/saf_database.dart';
 
 part 'exercise_detail_event.dart';
 part 'exercise_detail_state.dart';
 
 class ExerciseDetailBloc
     extends Bloc<ExerciseDetailEvent, ExerciseDetailState> {
-  final FavoritesService _favoritesService = FavoritesService();
-  final ExerciseCacheDb _cacheDb = ExerciseCacheDb.instance;
+  final SafDatabase _cacheDb = SafDatabase.instance;
   final MuscleWikiService _service = MuscleWikiService();
 
   ExerciseDetailBloc() : super(ExerciseDetailInitial()) {
     on<ExerciseDetailLoad>(_onLoad);
     on<ExerciseDetailVideoPageChanged>(_onVideoPageChanged);
-    on<ExerciseDetailFavoriteToggled>(_onFavoriteToggled);
   }
 
   Future<void> _onLoad(
@@ -28,19 +25,15 @@ class ExerciseDetailBloc
     try {
       final cached = await _cacheDb.getExercise(exercise.id);
       if (cached != null && cached.videos.isNotEmpty) {
-        exercise = cached;
-        final isFavorite = await _favoritesService.isFavorite(exercise.id);
         emit(ExerciseDetailLoaded(
-          exercise: exercise,
+          exercise: cached,
           currentVideoPage: 0,
-          isFavorite: isFavorite,
         ));
         return;
       }
     } catch (_) {}
 
     // 2. Cache miss — fetch full exercise from /exercises/{id}
-    //    (the list endpoint only returns id + name, NOT videos or steps)
     try {
       final full = await _service.getExerciseById(
         exercise.id,
@@ -55,11 +48,9 @@ class ExerciseDetailBloc
       // Network failed — fall back to the minimal exercise from the list
     }
 
-    final isFavorite = await _favoritesService.isFavorite(exercise.id);
     emit(ExerciseDetailLoaded(
       exercise: exercise,
       currentVideoPage: 0,
-      isFavorite: isFavorite,
     ));
   }
 
@@ -71,18 +62,5 @@ class ExerciseDetailBloc
     if (current is ExerciseDetailLoaded) {
       emit(current.copyWith(currentVideoPage: event.page));
     }
-  }
-
-  Future<void> _onFavoriteToggled(
-    ExerciseDetailFavoriteToggled event,
-    Emitter<ExerciseDetailState> emit,
-  ) async {
-    final current = state;
-    if (current is! ExerciseDetailLoaded) return;
-    final isNowFavorite = await _favoritesService.toggleFavorite(
-      event.exercise.id,
-      event.exercise,
-    );
-    emit(current.copyWith(isFavorite: isNowFavorite));
   }
 }

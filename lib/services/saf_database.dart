@@ -2,12 +2,14 @@ import 'dart:convert';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart' as p;
 import 'muscle_wiki_service.dart';
+import '../models/workout_plan.dart';
 
-/// Sqflite-backed cache for MuscleWikiExercise objects.
-/// Stores id, name, steps, videos, primaryMuscles, category, difficulty, muscleSlug.
-class ExerciseCacheDb {
-  ExerciseCacheDb._();
-  static final ExerciseCacheDb instance = ExerciseCacheDb._();
+/// Central sqflite database for the SAF Gym App.
+/// Replaces `ExerciseCacheDb` and `WorkoutPlanService`.
+/// Provides local caching for exercises and persistence for workout plans.
+class SafDatabase {
+  SafDatabase._();
+  static final SafDatabase instance = SafDatabase._();
 
   static Database? _db;
 
@@ -18,11 +20,13 @@ class ExerciseCacheDb {
 
   Future<Database> _open() async {
     final dbPath = await getDatabasesPath();
-    final path = p.join(dbPath, 'exercise_cache.db');
+    final path = p.join(dbPath, 'saf_gym.db');
+
     return openDatabase(
       path,
       version: 1,
       onCreate: (db, _) async {
+        // 1. Exercises Table (Cache)
         await db.execute('''
           CREATE TABLE exercises (
             id INTEGER PRIMARY KEY,
@@ -36,9 +40,20 @@ class ExerciseCacheDb {
             cached_at INTEGER NOT NULL
           )
         ''');
+
+        // 2. Workout Plans Table
+        await db.execute('''
+          CREATE TABLE workout_plans (
+            id TEXT PRIMARY KEY,
+            data_json TEXT NOT NULL,
+            updated_at INTEGER NOT NULL
+          )
+        ''');
       },
     );
   }
+
+  // ── Exercises Cache (Replaces ExerciseCacheDb) ──────────────────────────
 
   /// Returns a cached exercise, or null if not found.
   Future<MuscleWikiExercise?> getExercise(int id) async {
@@ -114,6 +129,47 @@ class ExerciseCacheDb {
       thumbnailUrl: thumbnailUrl,
       gifUrl: gifUrl,
       videos: rawVideos,
+    );
+  }
+
+  // ── Workout Plans (Replaces WorkoutPlanService) ─────────────────────────
+
+  Future<List<WorkoutPlan>> getPlans() async {
+    final db = await _database;
+    final rows = await db.query(
+      'workout_plans',
+      orderBy: 'updated_at DESC', // Return newest first
+    );
+    final plans = <WorkoutPlan>[];
+    for (final row in rows) {
+      try {
+        final plan = WorkoutPlan.fromJson(
+            jsonDecode(row['data_json'] as String) as Map<String, dynamic>);
+        plans.add(plan);
+      } catch (_) {}
+    }
+    return plans;
+  }
+
+  Future<void> savePlan(WorkoutPlan plan) async {
+    final db = await _database;
+    await db.insert(
+      'workout_plans',
+      {
+        'id': plan.id,
+        'data_json': jsonEncode(plan.toJson()),
+        'updated_at': DateTime.now().millisecondsSinceEpoch,
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<void> deletePlan(String planId) async {
+    final db = await _database;
+    await db.delete(
+      'workout_plans',
+      where: 'id = ?',
+      whereArgs: [planId],
     );
   }
 }

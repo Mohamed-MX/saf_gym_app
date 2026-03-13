@@ -13,9 +13,3 @@ class ExerciseDetailVideoPageChanged extends ExerciseDetailEvent {
   final int page;
   ExerciseDetailVideoPageChanged(this.page);
 }
-
-/// Fired when the user taps the heart (favorite) button.
-class ExerciseDetailFavoriteToggled extends ExerciseDetailEvent {
-  final MuscleWikiExercise exercise;
-  ExerciseDetailFavoriteToggled(this.exercise);
-}

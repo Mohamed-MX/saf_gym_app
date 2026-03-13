@@ -35,16 +35,15 @@ class _MuscleRegion {
   const _MuscleRegion(this.id, this.label, this.isFront, this.hitRect);
 }
 
-const _muscleRegions = <_MuscleRegion>[
+const _muscleRegions = <_MuscleRegion>[                 // ( x , y , w , h )
   // FRONT side
-  _MuscleRegion('abdominals', 'Abs', true, Rect.fromLTWH(0.35, 0.27, 0.30, 0.25)),
+  _MuscleRegion('abdominals', 'Abs', true, Rect.fromLTWH(0.40, 0.30, 0.18, 0.15)),
   _MuscleRegion('obliques', 'Obliques', true, Rect.fromLTWH(0.23, 0.30, 0.13, 0.18)),
   _MuscleRegion('chest', 'Chest', true, Rect.fromLTWH(0.28, 0.16, 0.44, 0.12)),
   _MuscleRegion('front-shoulders', 'Shoulders', true, Rect.fromLTWH(0.13, 0.14, 0.15, 0.11)),
   _MuscleRegion('biceps', 'Biceps', true, Rect.fromLTWH(0.07, 0.24, 0.12, 0.14)),
   _MuscleRegion('forearms', 'Forearms', true, Rect.fromLTWH(0.04, 0.37, 0.12, 0.12)),
   _MuscleRegion('quads', 'Quads', true, Rect.fromLTWH(0.27, 0.52, 0.46, 0.19)),
-  _MuscleRegion('calves', 'Calves', true, Rect.fromLTWH(0.28, 0.79, 0.44, 0.14)),
   // back extras shown on front side (right side of body in svg)
   _MuscleRegion('front-shoulders', 'Shoulders', true, Rect.fromLTWH(0.72, 0.14, 0.15, 0.11)),
   _MuscleRegion('forearms', 'Forearms', true, Rect.fromLTWH(0.84, 0.37, 0.12, 0.12)),
@@ -258,77 +257,103 @@ class _MuscleSelectionViewState extends State<_MuscleSelectionView>
 
   // ── Build body diagram with interactive overlay ─────────────────────────
   Widget _buildBodyMap(MuscleSelectionViewModel vm) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final w = constraints.maxWidth;
-        final h = constraints.maxHeight;
+    // 🛠️🪲🚧 DEBUG MODE: Makes the boxes visible!
+    const bool isDebugMode = true;
 
-        final regions = _muscleRegions.where((r) => r.isFront == vm.isFront).toList();
+    return Center(
+      child: AspectRatio(
+        aspectRatio: 660 / 1206,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final w = constraints.maxWidth;
+            final h = constraints.maxHeight;
 
-        return ClipRRect(
-          borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              // ── Base body diagram ──────────────────────────────────────
-              SvgPicture.asset(
-                vm.bodyAsset,
-                fit: BoxFit.contain,
-                placeholderBuilder: (_) => const Center(
-                  child: CircularProgressIndicator(color: AppTheme.primaryBlue),
-                ),
+            final regions = _muscleRegions.where((r) => r.isFront == vm.isFront).toList();
+
+            return ClipRRect(
+              borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  // ── Base body diagram ──────────────────────────────────────
+                  SvgPicture.asset(
+                    vm.bodyAsset,
+                    fit: BoxFit.contain,
+                    placeholderBuilder: (_) => const Center(
+                      child: CircularProgressIndicator(color: AppTheme.primaryBlue),
+                    ),
+                  ),
+
+                  // ── Blue highlight overlays for selected muscles ────────────
+                  for (final muscleId in vm.selectedMuscles)
+                    if (_muscleOverlays.containsKey(muscleId))
+                      AnimatedBuilder(
+                        animation: _pulseAnim,
+                        builder: (_, _) => Opacity(
+                          opacity: _pulseAnim.value,
+                          child: SvgPicture.asset(
+                            'assets/SVGs/${_muscleOverlays[muscleId]}',
+                            fit: BoxFit.contain,
+                          ),
+                        ),
+                      ),
+
+                  // ── Transparent tap targets for each region ────────────────
+                  ...regions.map((region) {
+                    final left = region.hitRect.left * w;
+                    final top = region.hitRect.top * h;
+                    final rw = region.hitRect.width * w;
+                    final rh = region.hitRect.height * h;
+
+                    return Positioned(
+                      left: left,
+                      top: top,
+                      width: rw,
+                      height: rh,
+                      child: GestureDetector(
+                        onTap: () => vm.onMuscleTap(region.id, region.label),
+                        child: isDebugMode
+                            ? Container(
+                          // DEBUG MODE UI: Red boxes with labels
+                          color: Colors.red.withValues(alpha: 0.4),
+                          child: Center(
+                            child: Text(
+                              region.label,
+                              style: const TextStyle(
+                                fontSize: 8,
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                decoration: TextDecoration.none,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        )
+                            : AnimatedContainer(
+                          // PRODUCTION UI: Your original invisible tap targets
+                          duration: const Duration(milliseconds: 180),
+                          decoration: BoxDecoration(
+                            color: vm.selectedMuscles.contains(region.id)
+                                ? AppTheme.primaryBlue.withValues(alpha: 0.0)
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+                            border: vm.selectedMuscles.contains(region.id)
+                                ? Border.all(
+                              color: AppTheme.primaryBlue.withValues(alpha: 0.0),
+                              width: 2,
+                            )
+                                : null,
+                          ),
+                        ),
+                      ),
+                    );
+                  }),
+                ],
               ),
-
-              // ── Blue highlight overlays for selected muscles ────────────
-              for (final muscleId in vm.selectedMuscles)
-                if (_muscleOverlays.containsKey(muscleId))
-                  AnimatedBuilder(
-                    animation: _pulseAnim,
-                    builder: (_, _) => Opacity(
-                      opacity: _pulseAnim.value,
-                      child: SvgPicture.asset(
-                        'assets/SVGs/${_muscleOverlays[muscleId]}',
-                        fit: BoxFit.contain,
-                      ),
-                    ),
-                  ),
-
-              // ── Transparent tap targets for each region ────────────────
-              ...regions.map((region) {
-                final left = region.hitRect.left * w;
-                final top = region.hitRect.top * h;
-                final rw = region.hitRect.width * w;
-                final rh = region.hitRect.height * h;
-
-                return Positioned(
-                  left: left,
-                  top: top,
-                  width: rw,
-                  height: rh,
-                  child: GestureDetector(
-                    onTap: () => vm.onMuscleTap(region.id, region.label),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 180),
-                      decoration: BoxDecoration(
-                        color: vm.selectedMuscles.contains(region.id)
-                            ? AppTheme.primaryBlue.withValues(alpha: 0.0)
-                            : Colors.transparent,
-                        borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-                        border: vm.selectedMuscles.contains(region.id)
-                            ? Border.all(
-                                color: AppTheme.primaryBlue.withValues(alpha: 0.0),
-                                width: 2,
-                              )
-                            : null,
-                      ),
-                    ),
-                  ),
-                );
-              }),
-            ],
-          ),
-        );
-      },
+            );
+          },
+        ),
+      ),
     );
   }
 

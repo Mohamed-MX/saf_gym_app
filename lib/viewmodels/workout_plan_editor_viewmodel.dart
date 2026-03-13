@@ -1,9 +1,11 @@
 import 'package:flutter/foundation.dart';
 import '../models/workout_plan.dart';
-import '../services/workout_plan_service.dart';
+import '../services/saf_database.dart';
+import '../services/muscle_wiki_service.dart';
 
 class WorkoutPlanEditorViewModel extends ChangeNotifier {
-  final WorkoutPlanService _service = WorkoutPlanService();
+  final SafDatabase _service = SafDatabase.instance;
+  final MuscleWikiService _apiService = MuscleWikiService();
 
   // ── Plan info ───────────────────────────────────────────────────────────
   String planName = '';
@@ -131,9 +133,38 @@ class WorkoutPlanEditorViewModel extends ChangeNotifier {
           .toList(),
     );
 
+    // Cache exercises for offline use before saving the plan metadata
+    await _cachePlanExercises(plan);
+
     await _service.savePlan(plan);
     _isSaving = false;
     notifyListeners();
     return plan;
+  }
+
+  // ── Offline Caching ──────────────────────────────────────────────────────
+  Future<void> _cachePlanExercises(WorkoutPlan plan) async {
+    final uniqueIds = <int>{};
+    for (final day in plan.days) {
+      for (final ex in day.exercises) {
+        uniqueIds.add(ex.exerciseId);
+      }
+    }
+
+    // Try fetching each exercise
+    final futures = uniqueIds.map((id) async {
+      // 1. Check if it's already in the cache
+      final cached = await _service.getExercise(id);
+      if (cached != null) return; // Already saved locally
+
+      // 2. If it's not, fetch the full definition from the API
+      final fullExercise = await _apiService.getExerciseById(id);
+      if (fullExercise != null) {
+        // 3. Save it to the cache so the detail screen can load it offline
+        await _service.upsertExercise(fullExercise);
+      }
+    });
+
+    await Future.wait(futures);
   }
 }

@@ -1,9 +1,9 @@
 import 'package:flutter/foundation.dart';
 import '../models/workout_plan.dart';
-import '../services/workout_plan_service.dart';
+import '../services/saf_database.dart';
 
 class WorkoutPlansViewModel extends ChangeNotifier {
-  final WorkoutPlanService _service = WorkoutPlanService();
+  final SafDatabase _service = SafDatabase.instance;
 
   List<WorkoutPlan> _plans = [];
   bool _isLoading = true;

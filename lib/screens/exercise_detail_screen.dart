@@ -276,7 +276,6 @@ class _ExerciseDetailViewState extends State<_ExerciseDetailView> {
                   ),
                   onPressed: () => Navigator.pop(context),
                 ),
-                actions: const [],
                 flexibleSpace: FlexibleSpaceBar(
                   background: Stack(
                     fit: StackFit.expand,
