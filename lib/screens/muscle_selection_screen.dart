@@ -9,11 +9,11 @@ import '../viewmodels/muscle_selection_viewmodel.dart';
 // Mapping of svg muscle group "id" → our asset file for the blue overlay
 const _muscleOverlays = <String, String>{
   'abdominals': 'abs simple.svg',
-  'obliques': 'abs simple.svg',
+  'obliques': 'Obliques simple.svg',
   'chest': 'chest simple.svg',
   'front-shoulders': 'shoulder simple.svg',
-  'biceps': 'arms simple.svg',
-  'forearms': 'arms simple.svg',
+  'biceps': 'Biceps Simple.svg',
+  'forearms': 'Forearm Simple.svg',
   'quads': 'thigh simple.svg',
   'calves': 'calf simple.svg',
   'traps': 'back simple.svg',
@@ -35,18 +35,24 @@ class _MuscleRegion {
   const _MuscleRegion(this.id, this.label, this.isFront, this.hitRect);
 }
 
-const _muscleRegions = <_MuscleRegion>[                 // ( x , y , w , h )
+const _muscleRegions = <_MuscleRegion>[                 // ( x , y T, w , h )
   // FRONT side
   _MuscleRegion('abdominals', 'Abs', true, Rect.fromLTWH(0.40, 0.30, 0.18, 0.15)),
-  _MuscleRegion('obliques', 'Obliques', true, Rect.fromLTWH(0.23, 0.30, 0.13, 0.18)),
-  _MuscleRegion('chest', 'Chest', true, Rect.fromLTWH(0.28, 0.16, 0.44, 0.12)),
-  _MuscleRegion('front-shoulders', 'Shoulders', true, Rect.fromLTWH(0.13, 0.14, 0.15, 0.11)),
-  _MuscleRegion('biceps', 'Biceps', true, Rect.fromLTWH(0.07, 0.24, 0.12, 0.14)),
-  _MuscleRegion('forearms', 'Forearms', true, Rect.fromLTWH(0.04, 0.37, 0.12, 0.12)),
-  _MuscleRegion('quads', 'Quads', true, Rect.fromLTWH(0.27, 0.52, 0.46, 0.19)),
+  _MuscleRegion('obliques', 'Obliques', true, Rect.fromLTWH(0.35, 0.30, 0.05, 0.16)),
+  _MuscleRegion('chest', 'Chest', true, Rect.fromLTWH(0.36, 0.23, 0.28, 0.07)),
+  _MuscleRegion('front-shoulders', 'Shoulders', true, Rect.fromLTWH(0.26, 0.22, 0.10, 0.06)),
+  _MuscleRegion('biceps', 'Biceps', true, Rect.fromLTWH(0.21, 0.28, 0.12, 0.09)),
+  _MuscleRegion('forearms', 'Forearms', true, Rect.fromLTWH(0.10, 0.35, 0.12, 0.10)),
+  _MuscleRegion('quads', 'Quads', true, Rect.fromLTWH(0.50, 0.47, 0.18, 0.22)),
+
+  // front  extras shown on front side (right side of body in svg)
+  _MuscleRegion('forearms', 'Forearms', true, Rect.fromLTWH(0.78, 0.35, 0.12, 0.10)),
+  _MuscleRegion('quads', 'Quads', true, Rect.fromLTWH(0.30, 0.47, 0.18, 0.22)),
+  _MuscleRegion('front-shoulders', 'Shoulders', true, Rect.fromLTWH(0.63, 0.22, 0.10, 0.06)),
+  _MuscleRegion('biceps', 'Biceps', true, Rect.fromLTWH(0.67, 0.28, 0.12, 0.09)),
+  _MuscleRegion('obliques', 'Obliques', true, Rect.fromLTWH(0.60, 0.30, 0.05, 0.16)),
   // back extras shown on front side (right side of body in svg)
-  _MuscleRegion('front-shoulders', 'Shoulders', true, Rect.fromLTWH(0.72, 0.14, 0.15, 0.11)),
-  _MuscleRegion('forearms', 'Forearms', true, Rect.fromLTWH(0.84, 0.37, 0.12, 0.12)),
+
   // BACK side
   _MuscleRegion('traps', 'Traps', false, Rect.fromLTWH(0.28, 0.13, 0.44, 0.09)),
   _MuscleRegion('lats', 'Lats', false, Rect.fromLTWH(0.22, 0.22, 0.56, 0.15)),
@@ -258,7 +264,7 @@ class _MuscleSelectionViewState extends State<_MuscleSelectionView>
   // ── Build body diagram with interactive overlay ─────────────────────────
   Widget _buildBodyMap(MuscleSelectionViewModel vm) {
     // 🛠️🪲🚧 DEBUG MODE: Makes the boxes visible!
-    const bool isDebugMode = true;
+    const bool isDebugMode = false;
 
     return Center(
       child: AspectRatio(
