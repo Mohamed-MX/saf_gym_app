@@ -51,10 +51,11 @@ const _muscleRegions = <_MuscleRegion>[                 // ( x , y T, w , h )
   _MuscleRegion('front-shoulders', 'Shoulders', true, Rect.fromLTWH(0.63, 0.22, 0.10, 0.06)),
   _MuscleRegion('biceps', 'Biceps', true, Rect.fromLTWH(0.67, 0.28, 0.12, 0.09)),
   _MuscleRegion('obliques', 'Obliques', true, Rect.fromLTWH(0.60, 0.30, 0.05, 0.16)),
+
   // back extras shown on front side (right side of body in svg)
 
   // BACK side
-  _MuscleRegion('traps', 'Traps', false, Rect.fromLTWH(0.28, 0.13, 0.44, 0.09)),
+  _MuscleRegion('traps', 'Traps', false, Rect.fromLTWH(0.38, 0.15, 0.24, 0.05)),
   _MuscleRegion('lats', 'Lats', false, Rect.fromLTWH(0.22, 0.22, 0.56, 0.15)),
   _MuscleRegion('lower-back', 'Lower Back', false, Rect.fromLTWH(0.32, 0.36, 0.36, 0.10)),
   _MuscleRegion('glutes', 'Glutes', false, Rect.fromLTWH(0.27, 0.44, 0.46, 0.12)),
@@ -264,7 +265,7 @@ class _MuscleSelectionViewState extends State<_MuscleSelectionView>
   // ── Build body diagram with interactive overlay ─────────────────────────
   Widget _buildBodyMap(MuscleSelectionViewModel vm) {
     // 🛠️🪲🚧 DEBUG MODE: Makes the boxes visible!
-    const bool isDebugMode = false;
+    const bool isDebugMode = true;
 
     return Center(
       child: AspectRatio(

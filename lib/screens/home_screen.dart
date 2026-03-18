@@ -6,6 +6,7 @@ import '../viewmodels/workout_plans_viewmodel.dart';
 import '../models/workout_plan.dart';
 import '../theme/app_theme.dart';
 import '../services/muscle_wiki_service.dart';
+import 'ai_workout_plan_screen.dart';
 import 'muscle_selection_screen.dart';
 import 'workout_plan_editor_screen.dart';
 import 'workout_plans_screen.dart';
@@ -90,7 +91,7 @@ class _HomeView extends StatelessWidget {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => const MuscleSelectionScreen(),
+                          builder: (_) => const AiWorkoutPlanScreen(),
                         ),
                       );
                     },
@@ -219,7 +220,11 @@ class _HomeHeader extends StatelessWidget {
                   // Profile avatar button
                   GestureDetector(
                     onTap: () {
-                      // Profile action placeholder
+                      showModalBottomSheet(
+                        context: context,
+                        backgroundColor: Colors.transparent,
+                        builder: (_) => const _ProfileSheet(),
+                      );
                     },
                     child: Container(
                       width: 48,
@@ -626,3 +631,117 @@ class _TodaysPlanCard extends StatelessWidget {
     );
   }
 }
+
+// ── Profile Bottom Sheet ───────────────────────────────────────────────────────
+
+class _ProfileSheet extends StatelessWidget {
+  const _ProfileSheet();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: AppTheme.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Drag handle
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: AppTheme.mediumGrey.withValues(alpha: 0.4),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(height: 24),
+
+          // Avatar
+          Container(
+            width: 64,
+            height: 64,
+            decoration: const BoxDecoration(
+              color: AppTheme.charcoal,
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.person_rounded, color: AppTheme.white, size: 36),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Your Profile',
+            style: GoogleFonts.outfit(
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              color: AppTheme.charcoal,
+            ),
+          ),
+          const SizedBox(height: 24),
+
+          // Edit Profile button
+          _SheetButton(
+            icon: Icons.edit_rounded,
+            label: 'Edit Profile',
+            iconColor: AppTheme.primaryBlue,
+            onTap: () => Navigator.pop(context),
+          ),
+          const SizedBox(height: 12),
+
+          // Log Out button
+          _SheetButton(
+            icon: Icons.logout_rounded,
+            label: 'Log Out',
+            iconColor: Colors.redAccent,
+            onTap: () => Navigator.pop(context),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SheetButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color iconColor;
+  final VoidCallback onTap;
+
+  const _SheetButton({
+    required this.icon,
+    required this.label,
+    required this.iconColor,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: iconColor.withValues(alpha: 0.07),
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          child: Row(
+            children: [
+              Icon(icon, color: iconColor, size: 22),
+              const SizedBox(width: 14),
+              Text(
+                label,
+                style: GoogleFonts.outfit(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: AppTheme.charcoal,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
