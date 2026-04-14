@@ -5,6 +5,7 @@ import '../viewmodels/workout_plans_viewmodel.dart';
 import '../models/workout_plan.dart';
 import '../theme/app_theme.dart';
 import 'workout_plan_editor_screen.dart';
+import 'workout_session_screen.dart';
 
 class WorkoutPlansScreen extends StatelessWidget {
   const WorkoutPlansScreen({super.key});
@@ -262,7 +263,7 @@ class _PlanCardState extends State<_PlanCard> {
           // ── Expanded day list ──
           if (_expanded) ...[
             const Divider(height: 1),
-            ...plan.days.map((day) => _DayRow(day: day)),
+            ...plan.days.map((day) => _DayRow(day: day, planName: plan.name)),
           ],
         ],
       ),
@@ -283,7 +284,8 @@ class _PlanCardState extends State<_PlanCard> {
 
 class _DayRow extends StatelessWidget {
   final WorkoutDay day;
-  const _DayRow({required this.day});
+  final String planName;
+  const _DayRow({required this.day, required this.planName});
 
   @override
   Widget build(BuildContext context) {
@@ -306,9 +308,36 @@ class _DayRow extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              Text(
-                '${day.exercises.length} exercise${day.exercises.length != 1 ? 's' : ''}',
-                style: const TextStyle(fontSize: 12, color: AppTheme.mediumGrey),
+              Expanded(
+                child: Text(
+                  '${day.exercises.length} exercise${day.exercises.length != 1 ? 's' : ''}',
+                  style: const TextStyle(fontSize: 12, color: AppTheme.mediumGrey),
+                ),
+              ),
+              // Play button
+              GestureDetector(
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => WorkoutSessionScreen(
+                      day: day,
+                      planName: planName,
+                    ),
+                  ),
+                ),
+                child: Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryBlue,
+                    borderRadius: BorderRadius.circular(AppTheme.radiusFull),
+                  ),
+                  child: const Icon(
+                    Icons.play_arrow_rounded,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                ),
               ),
             ],
           ),

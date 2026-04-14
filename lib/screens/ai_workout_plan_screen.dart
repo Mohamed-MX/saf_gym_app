@@ -161,12 +161,14 @@ class _AiWorkoutPlanScreenState extends State<AiWorkoutPlanScreen>
                   Row(
                     children: ExperienceLevel.values.map((level) {
                       final isSelected = _selectedLevel == level;
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 10),
-                        child: _LevelChip(
-                          label: level.label,
-                          isSelected: isSelected,
-                          onTap: () => setState(() => _selectedLevel = level),
+                      return Flexible(
+                        child: Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: _LevelChip(
+                            label: level.label,
+                            isSelected: isSelected,
+                            onTap: () => setState(() => _selectedLevel = level),
+                          ),
                         ),
                       );
                     }).toList(),
@@ -445,7 +447,8 @@ class _LevelChip extends StatelessWidget {
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
         decoration: BoxDecoration(
           color: isSelected ? AppTheme.primaryBlue : AppTheme.white,
           borderRadius: BorderRadius.circular(50),
@@ -463,10 +466,13 @@ class _LevelChip extends StatelessWidget {
                 ]
               : [],
         ),
+        alignment: Alignment.center,
         child: Text(
           label,
+          textAlign: TextAlign.center,
+          overflow: TextOverflow.ellipsis,
           style: GoogleFonts.outfit(
-            fontSize: 14,
+            fontSize: 13,
             fontWeight: FontWeight.w600,
             color: isSelected ? AppTheme.white : AppTheme.charcoal,
           ),

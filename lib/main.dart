@@ -7,6 +7,7 @@ import 'screens/home_screen.dart';
 import 'screens/categories_screen.dart';
 import 'screens/muscle_selection_screen.dart';
 import 'screens/workout_plans_screen.dart';
+import 'ble/ble_manager.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();

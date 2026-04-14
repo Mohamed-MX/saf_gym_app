@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import '../viewmodels/home_viewmodel.dart';
 import '../viewmodels/workout_plans_viewmodel.dart';
 import '../models/workout_plan.dart';
 import '../theme/app_theme.dart';
 import '../services/muscle_wiki_service.dart';
+import '../ble/ble_manager.dart';
 import 'ai_workout_plan_screen.dart';
-import 'muscle_selection_screen.dart';
+import 'rep_game_screen.dart';
 import 'workout_plan_editor_screen.dart';
 import 'workout_plans_screen.dart';
 
@@ -113,6 +115,19 @@ class _HomeView extends StatelessWidget {
                       );
                     },
                   ),
+                  const SizedBox(height: 14),
+
+                  // Rep Game
+                  _GameCard(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const RepGameScreen(),
+                        ),
+                      );
+                    },
+                  ),
 
                   const SizedBox(height: 28),
 
@@ -164,9 +179,43 @@ class _HomeView extends StatelessWidget {
 
 // ── Header Widget ─────────────────────────────────────────────────────────────
 
-class _HomeHeader extends StatelessWidget {
+class _HomeHeader extends StatefulWidget {
   final HomeViewModel vm;
   const _HomeHeader({required this.vm});
+
+  @override
+  State<_HomeHeader> createState() => _HomeHeaderState();
+}
+
+class _HomeHeaderState extends State<_HomeHeader> {
+  // Shared BLE manager instance shown in header dot + passed to sheet
+  final BleManager _bleManager = BleManager();
+  bool _bleConnected = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _bleManager.onDataCallback = (_, __, ___) {
+      if (mounted && !_bleConnected) {
+        setState(() => _bleConnected = true);
+      }
+    };
+  }
+
+  void _openBleSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => _BleSheet(
+        bleManager: _bleManager,
+        isConnected: _bleConnected,
+        onConnectionChanged: (connected) {
+          if (mounted) setState(() => _bleConnected = connected);
+        },
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -189,7 +238,7 @@ class _HomeHeader extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Top row: title + profile
+              // Top row: title + BT icon + profile
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -217,7 +266,63 @@ class _HomeHeader extends StatelessWidget {
                       ],
                     ),
                   ),
-                  // Profile avatar button
+
+                  // ── Bluetooth icon button ────────────────────────────────
+                  GestureDetector(
+                    onTap: _openBleSheet,
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            color: _bleConnected
+                                ? Colors.greenAccent.withValues(alpha: 0.2)
+                                : AppTheme.white.withValues(alpha: 0.12),
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: _bleConnected
+                                  ? Colors.greenAccent.withValues(alpha: 0.6)
+                                  : AppTheme.white.withValues(alpha: 0.3),
+                              width: 2,
+                            ),
+                          ),
+                          child: Icon(
+                            _bleConnected
+                                ? Icons.bluetooth_connected_rounded
+                                : Icons.bluetooth_rounded,
+                            color: _bleConnected
+                                ? Colors.greenAccent
+                                : AppTheme.white,
+                            size: 24,
+                          ),
+                        ),
+                        // Status dot
+                        Positioned(
+                          top: 0,
+                          right: 0,
+                          child: Container(
+                            width: 12,
+                            height: 12,
+                            decoration: BoxDecoration(
+                              color: _bleConnected
+                                  ? Colors.greenAccent
+                                  : Colors.redAccent,
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: AppTheme.primaryBlue,
+                                width: 2,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+
+                  // ── Profile avatar ───────────────────────────────────────
                   GestureDetector(
                     onTap: () {
                       showModalBottomSheet(
@@ -282,7 +387,351 @@ class _HomeHeader extends StatelessWidget {
   }
 }
 
+// ── BLE Connection Sheet ───────────────────────────────────────────────────────
+
+class _BleSheet extends StatefulWidget {
+  final BleManager bleManager;
+  final bool isConnected;
+  final ValueChanged<bool> onConnectionChanged;
+
+  const _BleSheet({
+    required this.bleManager,
+    required this.isConnected,
+    required this.onConnectionChanged,
+  });
+
+  @override
+  State<_BleSheet> createState() => _BleSheetState();
+}
+
+class _BleSheetState extends State<_BleSheet> {
+  bool _isScanning = false;
+  bool _isConnecting = false;
+  final List<ScanResult> _scanResults = [];
+
+  @override
+  void initState() {
+    super.initState();
+    // Listen to scan results
+    FlutterBluePlus.scanResults.listen((results) {
+      if (mounted) {
+        setState(() {
+          _scanResults.clear();
+          _scanResults.addAll(
+            results.where((r) => r.device.platformName.isNotEmpty),
+          );
+        });
+      }
+    });
+    // Listen to scanning state
+    FlutterBluePlus.isScanning.listen((scanning) {
+      if (mounted) setState(() => _isScanning = scanning);
+    });
+  }
+
+  @override
+  void dispose() {
+    FlutterBluePlus.stopScan();
+    super.dispose();
+  }
+
+  Future<void> _startScan() async {
+    setState(() {
+      _scanResults.clear();
+      _isScanning = true;
+    });
+    await FlutterBluePlus.startScan(timeout: const Duration(seconds: 5));
+  }
+
+  Future<void> _connectTo(BluetoothDevice device) async {
+    setState(() => _isConnecting = true);
+    try {
+      await FlutterBluePlus.stopScan();
+      widget.bleManager.device = device;
+      await device.connect(timeout: const Duration(seconds: 8));
+      widget.bleManager.discoverServices();
+      widget.onConnectionChanged(true);
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Connection failed: $e'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isConnecting = false);
+    }
+  }
+
+  Future<void> _disconnect() async {
+    final device = widget.bleManager.device;
+    if (device != null) {
+      await device.disconnect();
+      widget.bleManager.device = null;
+      widget.bleManager.characteristic = null;
+      widget.onConnectionChanged(false);
+    }
+    if (mounted) Navigator.pop(context);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Color(0xFF1A2035),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Drag handle
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.white24,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // Title row
+          Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: widget.isConnected
+                      ? Colors.greenAccent.withValues(alpha: 0.15)
+                      : AppTheme.primaryBlue.withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  widget.isConnected
+                      ? Icons.bluetooth_connected_rounded
+                      : Icons.bluetooth_searching_rounded,
+                  color: widget.isConnected
+                      ? Colors.greenAccent
+                      : AppTheme.accentBlue,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Sensor Connection',
+                    style: GoogleFonts.outfit(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: AppTheme.white,
+                    ),
+                  ),
+                  Text(
+                    widget.isConnected
+                        ? 'SmartGymSensor connected'
+                        : 'Find & connect your sensor',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: widget.isConnected
+                          ? Colors.greenAccent
+                          : Colors.white38,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+
+          // If connected — show disconnect button
+          if (widget.isConnected) ...[
+            _BleActionButton(
+              label: 'Disconnect Sensor',
+              icon: Icons.bluetooth_disabled_rounded,
+              color: Colors.redAccent,
+              onTap: _disconnect,
+            ),
+          ] else ...[
+            // Scan button
+            _BleActionButton(
+              label: _isScanning ? 'Scanning…' : 'Scan for Devices',
+              icon: _isScanning
+                  ? Icons.radar_rounded
+                  : Icons.search_rounded,
+              color: AppTheme.primaryBlue,
+              onTap: _isScanning ? null : _startScan,
+              loading: _isScanning,
+            ),
+            const SizedBox(height: 16),
+
+            // Device list
+            if (_scanResults.isEmpty && !_isScanning)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: Text(
+                  'No devices found. Tap Scan to search.',
+                  style: TextStyle(
+                    color: Colors.white38,
+                    fontSize: 13,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              )
+            else
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 260),
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: _scanResults.length,
+                  separatorBuilder: (_, _) => const Divider(
+                    color: Colors.white10,
+                    height: 1,
+                  ),
+                  itemBuilder: (_, i) {
+                    final r = _scanResults[i];
+                    final name = r.device.platformName.isNotEmpty
+                        ? r.device.platformName
+                        : r.device.remoteId.str;
+                    final isSensor = name == 'SmartGymSensor';
+                    return ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: isSensor
+                              ? AppTheme.primaryBlue.withValues(alpha: 0.2)
+                              : Colors.white.withValues(alpha: 0.05),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          isSensor
+                              ? Icons.sensors_rounded
+                              : Icons.bluetooth_rounded,
+                          color: isSensor
+                              ? AppTheme.accentBlue
+                              : Colors.white38,
+                          size: 20,
+                        ),
+                      ),
+                      title: Text(
+                        name,
+                        style: GoogleFonts.outfit(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: isSensor
+                              ? AppTheme.white
+                              : Colors.white60,
+                        ),
+                      ),
+                      subtitle: Text(
+                        'RSSI: ${r.rssi} dBm',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.white38,
+                        ),
+                      ),
+                      trailing: _isConnecting
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: AppTheme.primaryBlue,
+                              ),
+                            )
+                          : TextButton(
+                              onPressed: () => _connectTo(r.device),
+                              style: TextButton.styleFrom(
+                                backgroundColor:
+                                    AppTheme.primaryBlue.withValues(alpha: 0.15),
+                                foregroundColor: AppTheme.accentBlue,
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 14, vertical: 8),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                              ),
+                              child: const Text('Connect'),
+                            ),
+                    );
+                  },
+                ),
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+// ── BLE Action Button ─────────────────────────────────────────────────────────
+
+class _BleActionButton extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final Color color;
+  final VoidCallback? onTap;
+  final bool loading;
+
+  const _BleActionButton({
+    required this.label,
+    required this.icon,
+    required this.color,
+    required this.onTap,
+    this.loading = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: color.withValues(alpha: onTap == null ? 0.08 : 0.15),
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (loading)
+                SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: color,
+                  ),
+                )
+              else
+                Icon(icon, color: color, size: 22),
+              const SizedBox(width: 10),
+              Text(
+                label,
+                style: GoogleFonts.outfit(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: color,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 // ── Stat Card ─────────────────────────────────────────────────────────────────
+
 
 class _StatCard extends StatelessWidget {
   final IconData icon;
@@ -397,6 +846,92 @@ class _CreateWorkoutCard extends StatelessWidget {
               ),
               const Icon(Icons.chevron_right_rounded, color: AppTheme.white, size: 26),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Game Card (blue) ──────────────────────────────────────────────────────────
+
+class _GameCard extends StatelessWidget {
+  final VoidCallback onTap;
+  const _GameCard({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        splashColor: Colors.white.withValues(alpha: 0.1),
+        child: Ink(
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xFF1565C0), Color(0xFF1A88FF)],
+            ),
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF1565C0).withValues(alpha: 0.35),
+                blurRadius: 14,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
+            child: Row(
+              children: [
+                Container(
+                  width: 52,
+                  height: 52,
+                  decoration: BoxDecoration(
+                    color: AppTheme.white.withValues(alpha: 0.18),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.gamepad_rounded,
+                    color: AppTheme.white,
+                    size: 30,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Game',
+                        style: GoogleFonts.outfit(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w800,
+                          color: AppTheme.white,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Count your reps with the sensor',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: AppTheme.white.withValues(alpha: 0.8),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(
+                  Icons.chevron_right_rounded,
+                  color: AppTheme.white,
+                  size: 26,
+                ),
+              ],
+            ),
           ),
         ),
       ),

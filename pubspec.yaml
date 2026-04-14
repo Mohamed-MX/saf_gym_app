@@ -47,6 +47,7 @@ dependencies:
   path: ^1.9.1
   video_player: ^2.9.2
   flutter_dotenv: ^5.2.1
+  flutter_blue_plus: ^1.33.0
 
 dependency_overrides:
   # path_provider_foundation 2.6.0+ pulls in objective_c 9.x which runs a

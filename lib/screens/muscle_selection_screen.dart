@@ -16,14 +16,14 @@ const _muscleOverlays = <String, String>{
   'forearms': 'Forearm Simple.svg',
   'quads': 'thigh simple.svg',
   'calves': 'calf simple.svg',
-  'traps': 'back simple.svg',
-  'traps-middle': 'back simple.svg',
-  'lats': 'back simple.svg',
-  'rear-shoulders': 'shoulder simple.svg',
-  'triceps': 'arms simple.svg',
+  'traps': 'traps simple.svg',
+  'traps-middle': 'middle traps simple.svg',
+  'lats': 'lats simple.svg',
+  'rear-shoulders': 'rear delts simple.svg',
+  'triceps': 'triceps simple.svg',
   'hamstrings': 'thigh simple.svg',
-  'glutes': 'back simple.svg',
-  'lower-back': 'back simple.svg',
+  'glutes': 'glutes simple.svg',
+  'lower-back': 'lower back simple.svg',
 };
 
 // ── All clickable muscle regions, with FRONT / BACK side info ──────────────
@@ -53,19 +53,19 @@ const _muscleRegions = <_MuscleRegion>[                 // ( x , y T, w , h )
   _MuscleRegion('obliques', 'Obliques', true, Rect.fromLTWH(0.60, 0.30, 0.05, 0.16)),
 
   // back extras shown on front side (right side of body in svg)
-
+  _MuscleRegion('lats', 'Lats', false, Rect.fromLTWH(0.55, 0.25, 0.13, 0.18)),
+  _MuscleRegion('rear-shoulders', 'Rear Delts', false, Rect.fromLTWH(0.26, 0.22, 0.10, 0.06)),
   // BACK side
-  _MuscleRegion('traps', 'Traps', false, Rect.fromLTWH(0.38, 0.15, 0.24, 0.05)),
-  _MuscleRegion('lats', 'Lats', false, Rect.fromLTWH(0.22, 0.22, 0.56, 0.15)),
-  _MuscleRegion('lower-back', 'Lower Back', false, Rect.fromLTWH(0.32, 0.36, 0.36, 0.10)),
-  _MuscleRegion('glutes', 'Glutes', false, Rect.fromLTWH(0.27, 0.44, 0.46, 0.12)),
+  _MuscleRegion('traps', 'Traps', false, Rect.fromLTWH(0.38, 0.20, 0.24, 0.04)),
+  _MuscleRegion('lats', 'Lats', false, Rect.fromLTWH(0.33, 0.25, 0.14, 0.18)),
+  _MuscleRegion('lower-back', 'Lower Back', false, Rect.fromLTWH(0.44, 0.34, 0.13, 0.10)),
+  _MuscleRegion('glutes', 'Glutes', false, Rect.fromLTWH(0.27, 0.44, 0.46, 0.08)),
   _MuscleRegion('hamstrings', 'Hamstrings', false, Rect.fromLTWH(0.27, 0.53, 0.46, 0.17)),
-  _MuscleRegion('calves', 'Calves', false, Rect.fromLTWH(0.28, 0.79, 0.44, 0.14)),
-  _MuscleRegion('rear-shoulders', 'Rear Delts', false, Rect.fromLTWH(0.13, 0.14, 0.15, 0.11)),
-  _MuscleRegion('rear-shoulders', 'Rear Delts', false, Rect.fromLTWH(0.72, 0.14, 0.15, 0.11)),
-  _MuscleRegion('triceps', 'Triceps', false, Rect.fromLTWH(0.07, 0.24, 0.12, 0.14)),
-  _MuscleRegion('triceps', 'Triceps', false, Rect.fromLTWH(0.81, 0.24, 0.12, 0.14)),
-  _MuscleRegion('traps-middle', 'Mid Traps', false, Rect.fromLTWH(0.30, 0.20, 0.40, 0.10)),
+  _MuscleRegion('calves', 'Calves', false, Rect.fromLTWH(0.28, 0.70, 0.44, 0.14)),
+  _MuscleRegion('rear-shoulders', 'Rear Delts', false, Rect.fromLTWH(0.63, 0.22, 0.10, 0.06)),
+  _MuscleRegion('triceps', 'Triceps', false, Rect.fromLTWH(0.21, 0.28, 0.12, 0.09)),
+  _MuscleRegion('triceps', 'Triceps', false, Rect.fromLTWH(0.67, 0.28, 0.12, 0.09)),
+  _MuscleRegion('traps-middle', 'Mid Traps', false, Rect.fromLTWH(0.45, 0.23, 0.10, 0.10)),
 ];
 
 class MuscleSelectionScreen extends StatelessWidget {
@@ -265,7 +265,7 @@ class _MuscleSelectionViewState extends State<_MuscleSelectionView>
   // ── Build body diagram with interactive overlay ─────────────────────────
   Widget _buildBodyMap(MuscleSelectionViewModel vm) {
     // 🛠️🪲🚧 DEBUG MODE: Makes the boxes visible!
-    const bool isDebugMode = true;
+    const bool isDebugMode = false;
 
     return Center(
       child: AspectRatio(
@@ -292,8 +292,12 @@ class _MuscleSelectionViewState extends State<_MuscleSelectionView>
                   ),
 
                   // ── Blue highlight overlays for selected muscles ────────────
+                  // Only show overlays for muscles that belong to the current view
                   for (final muscleId in vm.selectedMuscles)
-                    if (_muscleOverlays.containsKey(muscleId))
+                    if (_muscleOverlays.containsKey(muscleId) &&
+                        _muscleRegions.any(
+                          (r) => r.id == muscleId && r.isFront == vm.isFront,
+                        ))
                       AnimatedBuilder(
                         animation: _pulseAnim,
                         builder: (_, _) => Opacity(
