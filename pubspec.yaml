@@ -48,6 +48,7 @@ dependencies:
   video_player: ^2.9.2
   flutter_dotenv: ^5.2.1
   flutter_blue_plus: ^1.33.0
+  tflite_flutter: ^0.11.0 # Or latest version
 
 dependency_overrides:
   # path_provider_foundation 2.6.0+ pulls in objective_c 9.x which runs a
@@ -83,6 +84,8 @@ flutter:
     - assets/icon.png
     - assets/logo.png
     - .env
+    - assets/models/sync_fitness_engine.tflite
+    - assets/models/sync_fitness_mappings.json
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

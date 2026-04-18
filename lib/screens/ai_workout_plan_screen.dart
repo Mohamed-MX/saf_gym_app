@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
+import '../services/saf_database.dart';
+import '../models/workout_plan.dart';
+import 'saf_ai_model_exp.dart';
 
 // ── Data Models ───────────────────────────────────────────────────────────────
 
@@ -16,12 +19,13 @@ enum TrainingGoal {
 }
 
 enum ExperienceLevel {
-  beginner('Beginner'),
-  intermediate('Intermediate'),
-  advanced('Advanced');
+  beginner('Beginner', AiExperienceLevel.beginner),
+  intermediate('Intermediate', AiExperienceLevel.intermediate),
+  advanced('Advanced', AiExperienceLevel.advanced);
 
   final String label;
-  const ExperienceLevel(this.label);
+  final AiExperienceLevel aiLevel;
+  const ExperienceLevel(this.label, this.aiLevel);
 }
 
 const List<String> _equipmentOptions = [
@@ -34,13 +38,7 @@ const List<String> _equipmentOptions = [
 ];
 
 const List<String> _weekDays = [
-  'Sun',
-  'Mon',
-  'Tue',
-  'Wen',
-  'Thu',
-  'Fri',
-  'Sat',
+  'Sun', 'Mon', 'Tue', 'Wen', 'Thu', 'Fri', 'Sat',
 ];
 
 // ── Screen ────────────────────────────────────────────────────────────────────
@@ -54,6 +52,7 @@ class AiWorkoutPlanScreen extends StatefulWidget {
 
 class _AiWorkoutPlanScreenState extends State<AiWorkoutPlanScreen>
     with SingleTickerProviderStateMixin {
+  // Training Goal is kept in state but not used in generation yet
   TrainingGoal _selectedGoal = TrainingGoal.hypertrophy;
   ExperienceLevel _selectedLevel = ExperienceLevel.intermediate;
   final Set<String> _selectedEquipment = {};
@@ -85,16 +84,31 @@ class _AiWorkoutPlanScreenState extends State<AiWorkoutPlanScreen>
     super.dispose();
   }
 
+  // ── Validation ──────────────────────────────────────────────────────────
+
+  bool get _canGenerate =>
+      _selectedDays.isNotEmpty && _selectedEquipment.isNotEmpty;
+
+  void _showValidationSnack(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        backgroundColor: AppTheme.primaryBlue,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
+  }
+
+  // ── Generate ────────────────────────────────────────────────────────────
+
   Future<void> _onGenerate() async {
     if (_selectedDays.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Please select at least one training day.'),
-          backgroundColor: AppTheme.primaryBlue,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        ),
-      );
+      _showValidationSnack('Please select at least one training day.');
+      return;
+    }
+    if (_selectedEquipment.isEmpty) {
+      _showValidationSnack('Please select at least one equipment type.');
       return;
     }
 
@@ -103,25 +117,62 @@ class _AiWorkoutPlanScreenState extends State<AiWorkoutPlanScreen>
 
     setState(() => _isGenerating = true);
 
-    // Simulate AI generation delay
-    await Future.delayed(const Duration(seconds: 2));
+    WorkoutPlan? plan;
+    String? errorMsg;
+
+    try {
+      plan = await SafAiModelExp.generateWorkout(
+        level: _selectedLevel.aiLevel,
+        equipment: Set.from(_selectedEquipment),
+        selectedDays: Set.from(_selectedDays),
+      );
+    } catch (e) {
+      errorMsg = 'Failed to generate plan. Check your connection and try again.';
+    } finally {
+      if (mounted) setState(() => _isGenerating = false);
+    }
 
     if (!mounted) return;
-    setState(() => _isGenerating = false);
 
-    // TODO: Navigate to generated plan result screen
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'AI Plan generated! Goal: ${_selectedGoal.label} · '
-          'Level: ${_selectedLevel.label} · Days: ${_selectedDays.join(", ")}',
-        ),
-        backgroundColor: AppTheme.primaryBlue,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    if (errorMsg != null || plan == null) {
+      _showValidationSnack(errorMsg ?? 'Unknown error.');
+      return;
+    }
+
+    // Show the plan preview popup
+    _showPlanPopup(plan);
+  }
+
+  // ── Plan Preview Popup ──────────────────────────────────────────────────
+
+  void _showPlanPopup(WorkoutPlan plan) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _PlanPreviewSheet(
+        plan: plan,
+        onAccept: () async {
+          await SafDatabase.instance.savePlan(plan);
+          if (!mounted) return;
+          Navigator.pop(context); // close sheet
+          Navigator.pop(context); // go back to previous screen
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('✅ "${plan.name}" saved to your plans!'),
+              backgroundColor: AppTheme.success,
+              behavior: SnackBarBehavior.floating,
+              shape:
+                  RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          );
+        },
+        onCancel: () => Navigator.pop(context),
       ),
     );
   }
+
+  // ── Build ───────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -129,18 +180,16 @@ class _AiWorkoutPlanScreenState extends State<AiWorkoutPlanScreen>
       backgroundColor: AppTheme.offWhite,
       body: Column(
         children: [
-          // ── Blue Header ──────────────────────────────────────────────────
           _AiPlanHeader(),
-
-          // ── Scrollable Body ──────────────────────────────────────────────
           Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(20, 24, 20, 120),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Training Goal
+                  // ── Training Goal (stored, not yet used in generation) ──
                   _SectionTitle('Training Goal'),
+                  const SizedBox(height: 4),
                   const SizedBox(height: 12),
                   ...TrainingGoal.values.map(
                     (goal) => Padding(
@@ -155,7 +204,7 @@ class _AiWorkoutPlanScreenState extends State<AiWorkoutPlanScreen>
 
                   const SizedBox(height: 20),
 
-                  // Experience Level
+                  // ── Experience Level ────────────────────────────────────
                   _SectionTitle('Experience Level'),
                   const SizedBox(height: 12),
                   Row(
@@ -167,7 +216,8 @@ class _AiWorkoutPlanScreenState extends State<AiWorkoutPlanScreen>
                           child: _LevelChip(
                             label: level.label,
                             isSelected: isSelected,
-                            onTap: () => setState(() => _selectedLevel = level),
+                            onTap: () =>
+                                setState(() => _selectedLevel = level),
                           ),
                         ),
                       );
@@ -176,7 +226,7 @@ class _AiWorkoutPlanScreenState extends State<AiWorkoutPlanScreen>
 
                   const SizedBox(height: 20),
 
-                  // Available Equipment
+                  // ── Available Equipment ─────────────────────────────────
                   _SectionTitle('Available Equipment'),
                   const SizedBox(height: 12),
                   _EquipmentGrid(
@@ -193,8 +243,8 @@ class _AiWorkoutPlanScreenState extends State<AiWorkoutPlanScreen>
 
                   const SizedBox(height: 20),
 
-                  // Days of the week
-                  _SectionTitle('Choose how many days of the week'),
+                  // ── Days of the week ────────────────────────────────────
+                  _SectionTitle('Choose Training Days'),
                   const SizedBox(height: 12),
                   _DaySelector(
                     days: _weekDays,
@@ -213,17 +263,15 @@ class _AiWorkoutPlanScreenState extends State<AiWorkoutPlanScreen>
           ),
         ],
       ),
-
-      // ── Generate Button ──────────────────────────────────────────────────
       bottomNavigationBar: _GenerateButton(
         isGenerating: _isGenerating,
         scaleAnimation: _buttonScale,
+        canGenerate: _canGenerate,
         onTap: _isGenerating ? null : _onGenerate,
       ),
     );
   }
 }
-
 // ── Header ─────────────────────────────────────────────────────────────────────
 
 class _AiPlanHeader extends StatelessWidget {
@@ -247,7 +295,6 @@ class _AiPlanHeader extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
           child: Row(
             children: [
-              // Back button
               GestureDetector(
                 onTap: () => Navigator.pop(context),
                 child: Container(
@@ -265,7 +312,6 @@ class _AiPlanHeader extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 14),
-              // Title & subtitle
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -290,7 +336,6 @@ class _AiPlanHeader extends StatelessWidget {
                   ],
                 ),
               ),
-              // Avatar
               Container(
                 width: 44,
                 height: 44,
@@ -303,9 +348,9 @@ class _AiPlanHeader extends StatelessWidget {
                   ),
                 ),
                 child: const Icon(
-                  Icons.person_rounded,
+                  Icons.auto_awesome,
                   color: AppTheme.white,
-                  size: 24,
+                  size: 22,
                 ),
               ),
             ],
@@ -380,7 +425,6 @@ class _GoalCard extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             child: Row(
               children: [
-                // Icon container
                 Container(
                   width: 48,
                   height: 48,
@@ -392,12 +436,13 @@ class _GoalCard extends StatelessWidget {
                   ),
                   child: Icon(
                     goal.icon,
-                    color: isSelected ? AppTheme.primaryBlue : AppTheme.mediumGrey,
+                    color: isSelected
+                        ? AppTheme.primaryBlue
+                        : AppTheme.mediumGrey,
                     size: 26,
                   ),
                 ),
                 const SizedBox(width: 14),
-                // Labels
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -520,7 +565,8 @@ class _EquipmentGrid extends StatelessWidget {
                   : AppTheme.white,
               borderRadius: BorderRadius.circular(14),
               border: Border.all(
-                color: isSelected ? AppTheme.primaryBlue : AppTheme.lightGrey,
+                color:
+                    isSelected ? AppTheme.primaryBlue : AppTheme.lightGrey,
                 width: 1.5,
               ),
             ),
@@ -530,7 +576,8 @@ class _EquipmentGrid extends StatelessWidget {
               style: GoogleFonts.outfit(
                 fontSize: 15,
                 fontWeight: FontWeight.w700,
-                color: isSelected ? AppTheme.primaryBlue : AppTheme.charcoal,
+                color:
+                    isSelected ? AppTheme.primaryBlue : AppTheme.charcoal,
               ),
             ),
           ),
@@ -555,7 +602,6 @@ class _DaySelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Two rows: first 4 days, then last 3
     final firstRow = days.sublist(0, 4);
     final secondRow = days.sublist(4);
 
@@ -650,11 +696,13 @@ class _DayChip extends StatelessWidget {
 
 class _GenerateButton extends StatelessWidget {
   final bool isGenerating;
+  final bool canGenerate;
   final Animation<double> scaleAnimation;
   final VoidCallback? onTap;
 
   const _GenerateButton({
     required this.isGenerating,
+    required this.canGenerate,
     required this.scaleAnimation,
     required this.onTap,
   });
@@ -681,19 +729,28 @@ class _GenerateButton extends StatelessWidget {
               duration: const Duration(milliseconds: 200),
               height: 60,
               decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [AppTheme.primaryBlue, Color(0xFF0A80E8)],
-                  begin: Alignment.centerLeft,
-                  end: Alignment.centerRight,
-                ),
+                gradient: canGenerate
+                    ? const LinearGradient(
+                        colors: [AppTheme.primaryBlue, Color(0xFF0A80E8)],
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
+                      )
+                    : LinearGradient(
+                        colors: [
+                          AppTheme.mediumGrey.withValues(alpha: 0.5),
+                          AppTheme.mediumGrey.withValues(alpha: 0.5),
+                        ],
+                      ),
                 borderRadius: BorderRadius.circular(18),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppTheme.primaryBlue.withValues(alpha: 0.45),
-                    blurRadius: 20,
-                    offset: const Offset(0, 6),
-                  ),
-                ],
+                boxShadow: canGenerate
+                    ? [
+                        BoxShadow(
+                          color: AppTheme.primaryBlue.withValues(alpha: 0.45),
+                          blurRadius: 20,
+                          offset: const Offset(0, 6),
+                        ),
+                      ]
+                    : [],
               ),
               child: isGenerating
                   ? const Center(
@@ -728,6 +785,406 @@ class _GenerateButton extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+// ── Plan Preview Bottom Sheet ──────────────────────────────────────────────────
+
+class _PlanPreviewSheet extends StatefulWidget {
+  final WorkoutPlan plan;
+  final VoidCallback onAccept;
+  final VoidCallback onCancel;
+
+  const _PlanPreviewSheet({
+    required this.plan,
+    required this.onAccept,
+    required this.onCancel,
+  });
+
+  @override
+  State<_PlanPreviewSheet> createState() => _PlanPreviewSheetState();
+}
+
+class _PlanPreviewSheetState extends State<_PlanPreviewSheet> {
+  final Set<int> _expandedDays = {0}; // first day open by default
+  bool _isSaving = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final plan = widget.plan;
+    final bottomPadding = MediaQuery.of(context).padding.bottom;
+
+    return DraggableScrollableSheet(
+      initialChildSize: 0.88,
+      minChildSize: 0.5,
+      maxChildSize: 0.95,
+      builder: (_, scrollController) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: AppTheme.offWhite,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          child: Column(
+            children: [
+              // ── Drag handle ──────────────────────────────────────────
+              const SizedBox(height: 12),
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppTheme.lightGrey,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // ── Sheet header ─────────────────────────────────────────
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        gradient: AppTheme.primaryGradient,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(
+                        Icons.auto_awesome,
+                        color: AppTheme.white,
+                        size: 22,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            plan.name,
+                            style: GoogleFonts.outfit(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                              color: AppTheme.charcoal,
+                            ),
+                          ),
+                          Text(
+                            '${plan.days.length} days · ${plan.totalExercises} exercises',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: AppTheme.mediumGrey,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 12),
+              const Divider(height: 1, color: AppTheme.lightGrey),
+
+              // ── Day accordion list ───────────────────────────────────
+              Expanded(
+                child: ListView.builder(
+                  controller: scrollController,
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+                  itemCount: plan.days.length,
+                  itemBuilder: (_, dayIdx) {
+                    final day = plan.days[dayIdx];
+                    final isExpanded = _expandedDays.contains(dayIdx);
+
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: AppTheme.white,
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.05),
+                              blurRadius: 8,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          children: [
+                            // Day header tap
+                            InkWell(
+                              onTap: () => setState(() {
+                                if (isExpanded) {
+                                  _expandedDays.remove(dayIdx);
+                                } else {
+                                  _expandedDays.add(dayIdx);
+                                }
+                              }),
+                              borderRadius: BorderRadius.circular(16),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 14),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      width: 36,
+                                      height: 36,
+                                      decoration: BoxDecoration(
+                                        color: isExpanded
+                                            ? AppTheme.primaryBlue
+                                            : AppTheme.lightGrey,
+                                        borderRadius:
+                                            BorderRadius.circular(10),
+                                      ),
+                                      child: Center(
+                                        child: Text(
+                                          '${dayIdx + 1}',
+                                          style: GoogleFonts.outfit(
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.w800,
+                                            color: isExpanded
+                                                ? AppTheme.white
+                                                : AppTheme.darkGrey,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Text(
+                                        day.dayName,
+                                        style: GoogleFonts.outfit(
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.w700,
+                                          color: AppTheme.charcoal,
+                                        ),
+                                      ),
+                                    ),
+                                    Text(
+                                      '${day.exercises.length} exercises',
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        color: AppTheme.mediumGrey,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Icon(
+                                      isExpanded
+                                          ? Icons.keyboard_arrow_up_rounded
+                                          : Icons.keyboard_arrow_down_rounded,
+                                      color: AppTheme.mediumGrey,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+
+                            // Exercise cards (expanded)
+                            if (isExpanded)
+                              Padding(
+                                padding: const EdgeInsets.fromLTRB(
+                                    12, 0, 12, 12),
+                                child: Column(
+                                  children: day.exercises.map((ex) {
+                                    return Padding(
+                                      padding:
+                                          const EdgeInsets.only(bottom: 8),
+                                      child: _ExercisePreviewRow(
+                                          exercise: ex),
+                                    );
+                                  }).toList(),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+
+              // ── Accept / Cancel buttons ──────────────────────────────
+              const Divider(height: 1, color: AppTheme.lightGrey),
+              Padding(
+                padding: EdgeInsets.fromLTRB(20, 16, 20, bottomPadding + 16),
+                child: Row(
+                  children: [
+                    // Cancel
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: widget.onCancel,
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppTheme.darkGrey,
+                          side: const BorderSide(color: AppTheme.lightGrey),
+                          padding:
+                              const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                        child: Text(
+                          'Cancel',
+                          style: GoogleFonts.outfit(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    // Accept
+                    Expanded(
+                      flex: 2,
+                      child: ElevatedButton(
+                        onPressed: _isSaving
+                            ? null
+                            : () async {
+                                setState(() => _isSaving = true);
+                                widget.onAccept();
+                              },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.success,
+                          foregroundColor: AppTheme.white,
+                          padding:
+                              const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          elevation: 0,
+                        ),
+                        child: _isSaving
+                            ? const SizedBox(
+                                width: 22,
+                                height: 22,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: AppTheme.white,
+                                ),
+                              )
+                            : Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.center,
+                                children: [
+                                  const Icon(Icons.check_circle_outline,
+                                      size: 20),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'Accept Plan',
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+// ── Exercise Preview Row ───────────────────────────────────────────────────────
+
+class _ExercisePreviewRow extends StatelessWidget {
+  final PlannedExercise exercise;
+  const _ExercisePreviewRow({required this.exercise});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppTheme.offWhite,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          // Thumbnail or placeholder
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: exercise.thumbnailUrl != null
+                ? Image.network(
+                    exercise.thumbnailUrl!,
+                    width: 44,
+                    height: 44,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => _placeholder(),
+                  )
+                : _placeholder(),
+          ),
+          const SizedBox(width: 12),
+          // Name & muscle group
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  exercise.name,
+                  style: GoogleFonts.outfit(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.charcoal,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                if ((exercise.muscleGroup ?? '').isNotEmpty)
+                  Text(
+                    exercise.muscleGroup!,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: AppTheme.mediumGrey,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+              ],
+            ),
+          ),
+          // Sets × Reps badge
+          Container(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: AppTheme.primaryBlue.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              '${exercise.sets}×${exercise.reps}',
+              style: GoogleFonts.outfit(
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+                color: AppTheme.primaryBlue,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _placeholder() {
+    return Container(
+      width: 44,
+      height: 44,
+      decoration: BoxDecoration(
+        color: AppTheme.lightGrey,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: const Icon(
+        Icons.fitness_center,
+        color: AppTheme.mediumGrey,
+        size: 20,
       ),
     );
   }
