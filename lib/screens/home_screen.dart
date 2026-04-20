@@ -1068,15 +1068,19 @@ class _TodaysPlanCard extends StatelessWidget {
                   // Day row + play button
                   Row(
                     children: [
-                      Text(
-                        planName != null ? '$planName — $todayName' : todayName,
-                        style: GoogleFonts.outfit(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w800,
-                          color: AppTheme.charcoal,
+                      Expanded(
+                        child: Text(
+                          planName != null ? '$planName — $todayName' : todayName,
+                          style: GoogleFonts.outfit(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            color: AppTheme.charcoal,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      const Spacer(),
+                      const SizedBox(width: 12),
                       // Play / Start button
                       GestureDetector(
                         onTap: onStart,

@@ -6,12 +6,15 @@ class ExercisePickerViewModel extends ChangeNotifier {
   final MuscleWikiService _service = MuscleWikiService();
 
   // ── Filter state ────────────────────────────────────────────────────────
-  String? selectedMuscle;
+  final Set<String> _selectedMuscles = {};
   String? selectedCategory;
   String? selectedDifficulty;
 
+  // ── Body Map state ───────────────────────────────────────────────────────
+  bool _isMale = true;
+  bool _isFront = true;
+
   // ── Available filter options ─────────────────────────────────────────────
-  List<String> muscles = [];
   List<String> categories = [];
   static const List<String> difficulties = [
     'Beginner', 'Intermediate', 'Advanced',
@@ -37,12 +40,23 @@ class ExercisePickerViewModel extends ChangeNotifier {
   Set<int> get selectedIds => Set.unmodifiable(_selectedIds);
   int get selectedCount => _selectedIds.length;
 
+  Set<String> get selectedMuscles => Set.unmodifiable(_selectedMuscles);
+  bool get isMale => _isMale;
+  bool get isFront => _isFront;
+  
   bool isSelected(int exerciseId) => _selectedIds.contains(exerciseId);
+  
+  String get bodyAsset {
+    final gender = _isMale ? 'Male' : 'Female';
+    final side = _isFront ? 'Front' : 'Back';
+    return 'assets/SVGs/$gender Simple $side.svg';
+  }
 
   ExercisePickerViewModel() {
     Future.microtask(() async {
       await _loadFilterOptions();
-      await search();
+      // Only search initially if there are filters, otherwise leave empty
+      // as requested by the user.
     });
   }
 
@@ -51,17 +65,23 @@ class ExercisePickerViewModel extends ChangeNotifier {
     _isLoadingFilters = true;
     notifyListeners();
     final results = await Future.wait([
-      _service.getApiMuscles(),
       _service.getApiCategories(),
     ]);
-    muscles = results[0];
-    categories = results[1];
+    categories = results[0];
     _isLoadingFilters = false;
     notifyListeners();
   }
 
   // ── Search / pagination ──────────────────────────────────────────────────
   Future<void> search() async {
+    // Only search if some filters are active to prevent draining requests
+    if (_selectedMuscles.isEmpty && selectedCategory == null && selectedDifficulty == null) {
+      _exercises = [];
+      _offset = 0;
+      _hasMore = false;
+      notifyListeners();
+      return;
+    }
     _exercises = [];
     _offset = 0;
     _hasMore = true;
@@ -78,7 +98,7 @@ class ExercisePickerViewModel extends ChangeNotifier {
     notifyListeners();
 
     final page = await _service.getExercisesFiltered(
-      muscle: selectedMuscle,
+      muscles: _selectedMuscles.toList(),
       category: selectedCategory,
       difficulty: selectedDifficulty,
       limit: _pageSize,
@@ -92,9 +112,28 @@ class ExercisePickerViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ── Filter setters ───────────────────────────────────────────────────────
-  void setMuscle(String? value) {
-    selectedMuscle = value;
+  // ── Body Map & Filter setters ────────────────────────────────────────────
+  void setGender(bool isMale) {
+    _isMale = isMale;
+    notifyListeners();
+  }
+
+  void setFront(bool isFront) {
+    _isFront = isFront;
+    notifyListeners();
+  }
+
+  void onMuscleTap(String muscleId) {
+    if (_selectedMuscles.contains(muscleId)) {
+      _selectedMuscles.remove(muscleId);
+    } else {
+      _selectedMuscles.add(muscleId);
+    }
+    search();
+  }
+
+  void removeSelectedMuscle(String muscleId) {
+    _selectedMuscles.remove(muscleId);
     search();
   }
 
@@ -109,7 +148,7 @@ class ExercisePickerViewModel extends ChangeNotifier {
   }
 
   void clearFilters() {
-    selectedMuscle = null;
+    _selectedMuscles.clear();
     selectedCategory = null;
     selectedDifficulty = null;
     search();

@@ -220,10 +220,11 @@ class _PlanCardState extends State<_PlanCard> {
                           overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: 4),
-                        Row(
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 4,
                           children: [
                             _pill('${plan.days.length} days', Icons.calendar_today_rounded),
-                            const SizedBox(width: 8),
                             _pill('${plan.totalExercises} exercises', Icons.sports_gymnastics),
                           ],
                         ),

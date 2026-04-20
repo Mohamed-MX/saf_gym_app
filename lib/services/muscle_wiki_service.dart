@@ -265,7 +265,7 @@ class MuscleWikiService {
   }
 
   Future<List<MuscleWikiExercise>> getExercisesFiltered({
-    String? muscle,
+    List<String>? muscles,
     String? category,
     String? difficulty,
     int limit = 20,
@@ -274,8 +274,13 @@ class MuscleWikiService {
     final allData = await _fetchData();
     var mapped = allData.map((e) => MuscleWikiExercise._mapper(e)).toList();
 
-    if (muscle != null && muscle.isNotEmpty) {
-      mapped = mapped.where((e) => e.primaryMuscles.contains(muscle)).toList();
+    if (muscles != null && muscles.isNotEmpty) {
+      mapped = mapped.where((e) {
+        return muscles.any((m) {
+          final apiMuscle = muscleSlugMap[m] ?? m;
+          return e.primaryMuscles.contains(apiMuscle);
+        });
+      }).toList();
     }
     if (category != null && category.isNotEmpty) {
       mapped = mapped.where((e) => e.category?.toLowerCase() == category.toLowerCase()).toList();
