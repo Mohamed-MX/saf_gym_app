@@ -1,5 +1,8 @@
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 
+BluetoothDevice? _connectedDevice;
+BluetoothCharacteristic? _notifyCharacteristic;
+
 // UUIDs (MUST match ESP32)
 final Guid serviceUUID =
     Guid("12345678-1234-1234-1234-1234567890ab");
@@ -8,6 +11,9 @@ final Guid charUUID =
     Guid("abcd1234-5678-1234-5678-abcdef123456");
 
 class BleManager {
+  static final BleManager _instance = BleManager._internal();
+  factory BleManager() => _instance;
+  BleManager._internal();
 
   BluetoothDevice? device;
   BluetoothCharacteristic? characteristic;
@@ -15,30 +21,56 @@ class BleManager {
   /// Optional callback invoked with the X, Y, Z acceleration values every sensor frame.
   void Function(double ax, double ay, double az)? onDataCallback;
 
+  Future<void> disconnect() async {
+    try {
+      if (_connectedDevice != null) {
+        await _connectedDevice!.disconnect();
+        print("🔌 Disconnected from BLE");
+        _connectedDevice = null;
+        _notifyCharacteristic = null;
+      }
+    } catch (e) {
+      print("Disconnect error: $e");
+    }
+  }
+
   // ===============================
   // STEP 1: SCAN + CONNECT
   // ===============================
-  void startScan() {
+  Future<void> startScan() async {
+    if (_connectedDevice != null) {
+      print("✅ Already connected, skipping scan");
+      return;
+    }
 
-    FlutterBluePlus.startScan(timeout: const Duration(seconds: 4));
+    // 🔥 VERY IMPORTANT: clean previous connection
+    await disconnect();
+
+    print("🔍 Scanning...");
+
+    FlutterBluePlus.startScan(timeout: Duration(seconds: 4));
 
     FlutterBluePlus.scanResults.listen((results) async {
-
       for (var r in results) {
 
-        if (r.device.platformName == "SmartGymSensor") {
+        if (r.device.platformName.contains("SmartGymSensor")) {
 
-          print("Device found!");
+          print("✅ Found device");
 
           await FlutterBluePlus.stopScan();
 
-          device = r.device;
+          _connectedDevice = r.device;
 
-          await device!.connect();
+          try {
+            await _connectedDevice!.connect(timeout: Duration(seconds: 5));
+            print("✅ Connected");
 
-          print("Connected!");
+            await discoverServices();
 
-          discoverServices();
+          } catch (e) {
+            print("❌ Connection failed: $e");
+          }
+
           break;
         }
       }
@@ -48,30 +80,40 @@ class BleManager {
   // ===============================
   // STEP 2: DISCOVER + SUBSCRIBE
   // ===============================
-  void discoverServices() async {
 
-    List<BluetoothService> services =
-        await device!.discoverServices();
+  Future<void> discoverServices() async {
+    if (_connectedDevice == null) return;
+
+    var services = await _connectedDevice!.discoverServices();
 
     for (var service in services) {
+      if (service.uuid.toString() == serviceUUID.toString()) {
 
-      if (service.uuid == serviceUUID) {
+        for (var c in service.characteristics) {
+          if (c.uuid.toString() == charUUID.toString()) {
 
-        for (var char in service.characteristics) {
+            _notifyCharacteristic = c;
 
-          if (char.uuid == charUUID) {
+            await c.setNotifyValue(true);
 
-            characteristic = char;
+            c.lastValueStream.listen((value) {
+              String data = String.fromCharCodes(value);
 
-            await characteristic!.setNotifyValue(true);
+              // parse CSV: time,ax,ay,az
+              List<String> parts = data.split(',');
 
-            characteristic!.lastValueStream.listen((value) {
+              if (parts.length >= 4) {
+                double ax = double.tryParse(parts[1]) ?? 0;
+                double ay = double.tryParse(parts[2]) ?? 0;
+                double az = double.tryParse(parts[3]) ?? 0;
 
-              final data = String.fromCharCodes(value);
-              onDataReceived(data);
+                if (onDataCallback != null) {
+                  onDataCallback!(ax, ay, az);
+                }
+              }
             });
 
-            print("Subscribed to data!");
+            print("📡 Notifications enabled");
           }
         }
       }

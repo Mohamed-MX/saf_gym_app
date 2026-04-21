@@ -58,6 +58,7 @@ class _RepGameScreenState extends State<RepGameScreen> {
     });
   }
 
+
   void _endGame() {
     setState(() {
       _appState = AppState.setup;
@@ -76,6 +77,7 @@ class _RepGameScreenState extends State<RepGameScreen> {
     });
   }
 
+
   @override
   void dispose() {
     _gameTimer?.cancel();
@@ -91,13 +93,13 @@ class _RepGameScreenState extends State<RepGameScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded, color: AppTheme.white),
-          onPressed: () {
-            if (_appState == AppState.game) {
-              _endGame();
-            } else {
-              Navigator.pop(context);
+            onPressed: () {
+              if (_appState == AppState.game) {
+                _endGame();
+              } else {
+                Navigator.pop(context);
+              }
             }
-          },
         ),
         title: Text(
           _appState == AppState.game ? 'Rep Game' : 'Sensor Setup',

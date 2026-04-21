@@ -2,19 +2,36 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+
 import '../viewmodels/home_viewmodel.dart';
 import '../viewmodels/workout_plans_viewmodel.dart';
 import '../models/workout_plan.dart';
 import '../theme/app_theme.dart';
 import '../services/muscle_wiki_service.dart';
 import '../ble/ble_manager.dart';
+
 import 'ai_workout_plan_screen.dart';
 import 'rep_game_screen.dart';
 import 'workout_plan_editor_screen.dart';
 import 'workout_plans_screen.dart';
 
-class HomeScreen extends StatelessWidget {
+// ── Changed to StatefulWidget to safely handle the scan on startup ──
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  final BleManager _bleManager = BleManager();
+
+  @override
+  void initState() {
+    super.initState();
+    // Safely start scanning exactly once when the screen loads
+    _bleManager.startScan();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -573,8 +590,8 @@ class _BleSheetState extends State<_BleSheet> {
 
             // Device list
             if (_scanResults.isEmpty && !_isScanning)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 12),
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 12),
                 child: Text(
                   'No devices found. Tap Scan to search.',
                   style: TextStyle(
@@ -640,27 +657,27 @@ class _BleSheetState extends State<_BleSheet> {
                       ),
                       trailing: _isConnecting
                           ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: AppTheme.primaryBlue,
-                              ),
-                            )
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: AppTheme.primaryBlue,
+                        ),
+                      )
                           : TextButton(
-                              onPressed: () => _connectTo(r.device),
-                              style: TextButton.styleFrom(
-                                backgroundColor:
-                                    AppTheme.primaryBlue.withValues(alpha: 0.15),
-                                foregroundColor: AppTheme.accentBlue,
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 14, vertical: 8),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                              ),
-                              child: const Text('Connect'),
-                            ),
+                        onPressed: () => _connectTo(r.device),
+                        style: TextButton.styleFrom(
+                          backgroundColor:
+                          AppTheme.primaryBlue.withValues(alpha: 0.15),
+                          foregroundColor: AppTheme.accentBlue,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 8),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        child: const Text('Connect'),
+                      ),
                     );
                   },
                 ),
@@ -731,7 +748,6 @@ class _BleActionButton extends StatelessWidget {
 }
 
 // ── Stat Card ─────────────────────────────────────────────────────────────────
-
 
 class _StatCard extends StatelessWidget {
   final IconData icon;
@@ -1012,7 +1028,7 @@ class _ActionCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                Icon(Icons.chevron_right_rounded, color: AppTheme.mediumGrey, size: 26),
+                const Icon(Icons.chevron_right_rounded, color: AppTheme.mediumGrey, size: 26),
               ],
             ),
           ),
@@ -1057,88 +1073,88 @@ class _TodaysPlanCard extends StatelessWidget {
         padding: const EdgeInsets.all(20),
         child: isLoadingPlans
             ? const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(16),
-                  child: CircularProgressIndicator(color: AppTheme.primaryBlue),
-                ),
-              )
+          child: Padding(
+            padding: EdgeInsets.all(16),
+            child: CircularProgressIndicator(color: AppTheme.primaryBlue),
+          ),
+        )
             : Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Day row + play button
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          planName != null ? '$planName — $todayName' : todayName,
-                          style: GoogleFonts.outfit(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w800,
-                            color: AppTheme.charcoal,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      // Play / Start button
-                      GestureDetector(
-                        onTap: onStart,
-                        child: Container(
-                          width: 44,
-                          height: 44,
-                          decoration: BoxDecoration(
-                            color: AppTheme.primaryBlue,
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: AppTheme.primaryBlue.withValues(alpha: 0.4),
-                                blurRadius: 12,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: const Icon(
-                            Icons.play_arrow_rounded,
-                            color: AppTheme.white,
-                            size: 26,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // Exercise list
-                  if (todayWorkout == null || todayWorkout!.exercises.isEmpty)
-                    _buildEmpty(context)
-                  else
-                    ...todayWorkout!.exercises.take(5).map(
-                          (ex) => Padding(
-                            padding: const EdgeInsets.only(bottom: 10),
-                            child: Text(
-                              '${ex.name} — ${ex.sets} sets × ${ex.reps} reps',
-                              style: const TextStyle(
-                                fontSize: 14,
-                                color: AppTheme.darkGrey,
-                                fontWeight: FontWeight.w400,
-                              ),
-                            ),
-                          ),
-                        ),
-
-                  if ((todayWorkout?.exercises.length ?? 0) > 5)
-                    Text(
-                      '+ ${todayWorkout!.exercises.length - 5} more exercises',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: AppTheme.primaryBlue,
-                        fontWeight: FontWeight.w600,
-                      ),
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Day row + play button
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    planName != null ? '$planName — $todayName' : todayName,
+                    style: GoogleFonts.outfit(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: AppTheme.charcoal,
                     ),
-                ],
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                // Play / Start button
+                GestureDetector(
+                  onTap: onStart,
+                  child: Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: AppTheme.primaryBlue,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppTheme.primaryBlue.withValues(alpha: 0.4),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.play_arrow_rounded,
+                      color: AppTheme.white,
+                      size: 26,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 16),
+
+            // Exercise list
+            if (todayWorkout == null || todayWorkout!.exercises.isEmpty)
+              _buildEmpty(context)
+            else
+              ...todayWorkout!.exercises.take(5).map(
+                    (ex) => Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Text(
+                    '${ex.name} — ${ex.sets} sets × ${ex.reps} reps',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: AppTheme.darkGrey,
+                      fontWeight: FontWeight.w400,
+                    ),
+                  ),
+                ),
               ),
+
+            if ((todayWorkout?.exercises.length ?? 0) > 5)
+              Text(
+                '+ ${todayWorkout!.exercises.length - 5} more exercises',
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: AppTheme.primaryBlue,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -1157,7 +1173,7 @@ class _TodaysPlanCard extends StatelessWidget {
         const SizedBox(height: 10),
         GestureDetector(
           onTap: onStart,
-          child: Text(
+          child: const Text(
             'Tap ▶ to create one now',
             style: TextStyle(
               fontSize: 14,
@@ -1283,4 +1299,3 @@ class _SheetButton extends StatelessWidget {
     );
   }
 }
-

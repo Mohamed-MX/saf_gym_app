@@ -86,6 +86,7 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
       setState(() {
         _completedSets[_currentIndex]++;
         _logic.reset();
+        _isTracking = false;
       });
     }
   }

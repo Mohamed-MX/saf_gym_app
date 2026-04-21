@@ -88,9 +88,9 @@ class RepGameLogic {
     double minRepDistance = 30.0;
 
     if (pointB > minRepDistance) { 
-      // Lowered thresholdDown to 0.30 so it waits until the weight is fully down
-      double thresholdUp = pointB * 0.70;
-      double thresholdDown = pointB * 0.30;
+      // Lowered thresholdDown to 0.15 so it waits until the weight is fully down
+      double thresholdUp = pointB * 0.60;
+      double thresholdDown = pointB * 0.15;
 
       if (fVal > thresholdUp) {
         isHigh = true;
@@ -98,7 +98,7 @@ class RepGameLogic {
         isHigh = false;
         
         int now = DateTime.now().millisecondsSinceEpoch;
-        // 2 second delay (1000ms) to strictly prevent any double counting
+        // 1 second delay (1000ms) to strictly prevent any double counting
         if (now - lastRepTime > 1000) {
           reps++;
           lastRepTime = now;
