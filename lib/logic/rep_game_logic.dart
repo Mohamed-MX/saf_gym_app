@@ -42,6 +42,7 @@ class RepGameLogic {
   double? startAy;
   double? startAz;
   double pointB = 0.0;
+  double pointA = 0.0;
   bool isHigh = false;
 
   // Add a simple debounce to completely prevent any double-counting
@@ -59,6 +60,7 @@ class RepGameLogic {
     startAy = null;
     startAz = null;
     pointB = 0.0;
+    pointA = 0.0;
     isHigh = false;
     lastRepTime = 0;
   }
@@ -69,6 +71,7 @@ class RepGameLogic {
       startAy = ay;
       startAz = az;
       pointB = 0.0;
+      pointA = 0.0;
     }
 
     double dist = sqrt(pow(ax - startAx!, 2) + pow(ay - startAy!, 2) + pow(az - startAz!, 2));
@@ -76,7 +79,7 @@ class RepGameLogic {
     rawVal = dist;
     fVal = kSensorAlpha * dist + (1 - kSensorAlpha) * fVal;
 
-    // Point B is the highest point (max distance) of the current rep
+    // Dynamic peak (pointB)
     if (fVal > pointB) {
       pointB = fVal;
     } else {
@@ -84,13 +87,22 @@ class RepGameLogic {
       pointB -= (pointB - fVal) * 0.005;
     }
 
-    // Minimum distance required to consider the movement a valid rep (noise filter)
-    double minRepDistance = 30.0;
+    // Dynamic baseline (pointA)
+    if (fVal < pointA) {
+      pointA = fVal;
+    } else {
+      // Decay pointA upwards to adapt to new resting positions
+      pointA += (fVal - pointA) * 0.005;
+    }
 
-    if (pointB > minRepDistance) { 
-      // Lowered thresholdDown to 0.15 so it waits until the weight is fully down
-      double thresholdUp = pointB * 0.60;
-      double thresholdDown = pointB * 0.15;
+    // Minimum range of motion required to consider the movement a valid rep
+    double minRepDistance = 30.0;
+    double rom = pointB - pointA;
+
+    if (rom > minRepDistance) { 
+      // Calculate thresholds relative to the dynamic baseline and peak
+      double thresholdUp = pointA + (rom * 0.60);
+      double thresholdDown = pointA + (rom * 0.15);
 
       if (fVal > thresholdUp) {
         isHigh = true;
@@ -107,7 +119,10 @@ class RepGameLogic {
     }
 
     if (pointB > 0) {
-      double normalizedDist = fVal / pointB; 
+      double normalizedDist = 0.0;
+      if (rom > 0) {
+        normalizedDist = (fVal - pointA) / rom;
+      }
       double targetY = 0.8 - (normalizedDist * 0.6);
       targetY = targetY.clamp(0.0, 1.0);
       

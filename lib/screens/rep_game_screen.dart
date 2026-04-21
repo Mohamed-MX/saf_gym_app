@@ -163,7 +163,7 @@ class _RepGameScreenState extends State<RepGameScreen> {
                     _sensorRow("Filt Dist", _logic.fVal.toStringAsFixed(0), Colors.green),
                     const SizedBox(height: 12),
                     _sectionLabel("AUTO MAPPING RANGE"),
-                    _sensorRow("Point A", "Fixed at Start", Colors.white54),
+                    _sensorRow("Point A (Min)", _logic.pointA.toStringAsFixed(0), Colors.white54),
                     _sensorRow("Point B (Max)", _logic.pointB.toStringAsFixed(0), Colors.white54),
                   ],
                 ),
