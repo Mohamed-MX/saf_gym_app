@@ -134,19 +134,7 @@ class _HomeView extends StatelessWidget {
                   ),
                   const SizedBox(height: 14),
 
-                  // Rep Game
-                  _GameCard(
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const RepGameScreen(),
-                        ),
-                      );
-                    },
-                  ),
-
-                  const SizedBox(height: 28),
+                  // Rep Game removed per request
 
                   // ── Today's Plan ─────────────────────────────────────────
                   Text(
@@ -869,91 +857,6 @@ class _CreateWorkoutCard extends StatelessWidget {
   }
 }
 
-// ── Game Card (blue) ──────────────────────────────────────────────────────────
-
-class _GameCard extends StatelessWidget {
-  final VoidCallback onTap;
-  const _GameCard({required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        splashColor: Colors.white.withValues(alpha: 0.1),
-        child: Ink(
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Color(0xFF1565C0), Color(0xFF1A88FF)],
-            ),
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF1565C0).withValues(alpha: 0.35),
-                blurRadius: 14,
-                offset: const Offset(0, 6),
-              ),
-            ],
-          ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
-            child: Row(
-              children: [
-                Container(
-                  width: 52,
-                  height: 52,
-                  decoration: BoxDecoration(
-                    color: AppTheme.white.withValues(alpha: 0.18),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.gamepad_rounded,
-                    color: AppTheme.white,
-                    size: 30,
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Game',
-                        style: GoogleFonts.outfit(
-                          fontSize: 17,
-                          fontWeight: FontWeight.w800,
-                          color: AppTheme.white,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Count your reps with the sensor',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: AppTheme.white.withValues(alpha: 0.8),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const Icon(
-                  Icons.chevron_right_rounded,
-                  color: AppTheme.white,
-                  size: 26,
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
 
 // ── Action Card (white) ───────────────────────────────────────────────────────
 
