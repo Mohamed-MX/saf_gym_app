@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/workout_plan.dart';
 import '../theme/app_theme.dart';
+import '../ble/ble_manager.dart';
+import '../logic/rep_game_logic.dart';
 
 /// Displays a guided workout session for a single [WorkoutDay].
 /// The user can step through each exercise and mark sets as done.
@@ -25,11 +27,49 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
   /// Track how many sets are completed per exercise index.
   late final List<int> _completedSets;
 
+  final BleManager _bleManager = BleManager();
+  final RepGameLogic _logic = RepGameLogic();
+  bool _bleConnected = false;
+  bool _isTracking = false;
+
   @override
   void initState() {
     super.initState();
     _completedSets =
         List.filled(widget.day.exercises.length, 0);
+    _initBle();
+  }
+
+  void _initBle() {
+    _bleManager.onDataCallback = (ax, ay, az) {
+      if (!mounted) return;
+
+      if (!_bleConnected) {
+        setState(() => _bleConnected = true);
+      }
+
+      if (!_isTracking) return;
+      
+      setState(() {
+        _logic.updateSensor(ax, ay, az);
+        
+        // Auto-complete set when reps reached
+        if (_logic.reps >= _current.reps) {
+          if (_completedSets[_currentIndex] < _current.sets) {
+            _completeSet();
+            _isTracking = false;
+          }
+        }
+      });
+    };
+    _bleManager.startScan();
+  }
+
+  void _startTracking() {
+    setState(() {
+      _isTracking = true;
+      _logic.reset();
+    });
   }
 
   PlannedExercise get _current =>
@@ -43,7 +83,10 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
 
   void _completeSet() {
     if (_completedSets[_currentIndex] < _current.sets) {
-      setState(() => _completedSets[_currentIndex]++);
+      setState(() {
+        _completedSets[_currentIndex]++;
+        _logic.reset();
+      });
     }
   }
 
@@ -51,12 +94,22 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
     if (_isLast) {
       _showFinishedDialog();
     } else {
-      setState(() => _currentIndex++);
+      setState(() {
+        _currentIndex++;
+        _logic.reset();
+        _isTracking = false;
+      });
     }
   }
 
   void _prev() {
-    if (_currentIndex > 0) setState(() => _currentIndex--);
+    if (_currentIndex > 0) {
+      setState(() {
+        _currentIndex--;
+        _logic.reset();
+        _isTracking = false;
+      });
+    }
   }
 
   void _showFinishedDialog() {
@@ -160,6 +213,30 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
         backgroundColor: AppTheme.offWhite,
         elevation: 0,
         foregroundColor: AppTheme.charcoal,
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 16),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Sensor',
+                  style: GoogleFonts.outfit(
+                    color: _bleConnected ? Colors.green : Colors.redAccent,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Icon(
+                  Icons.bluetooth_rounded,
+                  color: _bleConnected ? Colors.green : Colors.redAccent,
+                  size: 20,
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
       body: Padding(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
@@ -176,6 +253,10 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
               child: _ExerciseCard(
                 exercise: _current,
                 completedSets: _completedSets[_currentIndex],
+                currentReps: _logic.reps,
+                bleConnected: _bleConnected,
+                isTracking: _isTracking,
+                onStartTracking: _startTracking,
                 onCompleteSet: _completeSet,
               ),
             ),
@@ -287,11 +368,19 @@ class _ProgressBar extends StatelessWidget {
 class _ExerciseCard extends StatelessWidget {
   final PlannedExercise exercise;
   final int completedSets;
+  final int currentReps;
+  final bool bleConnected;
+  final bool isTracking;
+  final VoidCallback onStartTracking;
   final VoidCallback onCompleteSet;
 
   const _ExerciseCard({
     required this.exercise,
     required this.completedSets,
+    required this.currentReps,
+    required this.bleConnected,
+    required this.isTracking,
+    required this.onStartTracking,
     required this.onCompleteSet,
   });
 
@@ -376,7 +465,37 @@ class _ExerciseCard extends StatelessWidget {
             ],
           ),
 
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
+
+          // Rep dots
+          Wrap(
+            alignment: WrapAlignment.center,
+            spacing: 6,
+            runSpacing: 6,
+            children: List.generate(exercise.reps, (i) {
+              final done = i < currentReps || completedSets >= exercise.sets;
+              return AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
+                width: done ? 16 : 12,
+                height: done ? 16 : 12,
+                decoration: BoxDecoration(
+                  color: done ? AppTheme.primaryBlue : AppTheme.lightGrey,
+                  shape: BoxShape.circle,
+                  boxShadow: done
+                      ? [
+                          BoxShadow(
+                            color: AppTheme.primaryBlue.withValues(alpha: 0.6),
+                            blurRadius: 8,
+                            spreadRadius: 2,
+                          )
+                        ]
+                      : null,
+                ),
+              );
+            }),
+          ),
+
+          const SizedBox(height: 16),
 
           // Set dots
           Row(
@@ -400,42 +519,64 @@ class _ExerciseCard extends StatelessWidget {
 
           const SizedBox(height: 24),
 
-          // Complete Set button
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: remaining > 0 ? onCompleteSet : null,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primaryBlue,
-                foregroundColor: AppTheme.white,
-                disabledBackgroundColor:
-                    Colors.green.withValues(alpha: 0.15),
-                disabledForegroundColor: Colors.green,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                    borderRadius:
-                        BorderRadius.circular(AppTheme.radiusFull)),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    remaining > 0
-                        ? Icons.check_rounded
-                        : Icons.check_circle_rounded,
+          // Buttons Row
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: (!bleConnected || remaining <= 0 || isTracking) ? null : onStartTracking,
+                  icon: Icon(
+                    isTracking ? Icons.sensors_rounded : Icons.play_arrow_rounded,
                     size: 20,
                   ),
-                  const SizedBox(width: 8),
-                  Text(
-                    remaining > 0
-                        ? 'Complete Set ($remaining left)'
-                        : 'All Sets Done ✓',
-                    style: GoogleFonts.outfit(
-                        fontWeight: FontWeight.w700, fontSize: 15),
+                  label: Text(
+                    isTracking ? 'Tracking' : 'Start',
+                    style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 15),
                   ),
-                ],
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.charcoal,
+                    foregroundColor: AppTheme.white,
+                    disabledBackgroundColor: isTracking ? AppTheme.charcoal.withValues(alpha: 0.5) : AppTheme.lightGrey,
+                    disabledForegroundColor: isTracking ? AppTheme.white : AppTheme.mediumGrey,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(AppTheme.radiusFull)),
+                  ),
+                ),
               ),
-            ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: remaining > 0 ? onCompleteSet : null,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primaryBlue,
+                    foregroundColor: AppTheme.white,
+                    disabledBackgroundColor: Colors.green.withValues(alpha: 0.15),
+                    disabledForegroundColor: Colors.green,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(AppTheme.radiusFull)),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        remaining > 0 ? Icons.check_rounded : Icons.check_circle_rounded,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: Text(
+                          remaining > 0 ? 'Complete ($remaining)' : 'Done ✓',
+                          style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 14),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),

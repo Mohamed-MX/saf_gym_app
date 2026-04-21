@@ -41,7 +41,7 @@ class _RepGameScreenState extends State<RepGameScreen> {
       if (!mounted) return;
 
       // Feed sensor to logic engine
-      _logic.updateSensor(ay);
+      _logic.updateSensor(ax, ay, az);
 
       if (!_bleConnected) {
         setState(() => _bleConnected = true);
@@ -156,13 +156,13 @@ class _RepGameScreenState extends State<RepGameScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _sectionLabel("LIVE SENSOR (Y-AXIS ONLY)"),
-                    _sensorRow("Raw Y", _logic.rawAy.toStringAsFixed(0), Colors.greenAccent.shade100),
-                    _sensorRow("Filtered Y", _logic.fAy.toStringAsFixed(0), Colors.green),
+                    _sectionLabel("LIVE SENSOR (DISTANCE FROM A)"),
+                    _sensorRow("Raw Dist", _logic.rawVal.toStringAsFixed(0), Colors.greenAccent.shade100),
+                    _sensorRow("Filt Dist", _logic.fVal.toStringAsFixed(0), Colors.green),
                     const SizedBox(height: 12),
                     _sectionLabel("AUTO MAPPING RANGE"),
-                    _sensorRow("Local Min", _logic.localMin.toStringAsFixed(0), Colors.white54),
-                    _sensorRow("Local Max", _logic.localMax.toStringAsFixed(0), Colors.white54),
+                    _sensorRow("Point A", "Fixed at Start", Colors.white54),
+                    _sensorRow("Point B (Max)", _logic.pointB.toStringAsFixed(0), Colors.white54),
                   ],
                 ),
               ),
@@ -251,8 +251,8 @@ class _RepGameScreenState extends State<RepGameScreen> {
                       crossAxisAlignment: CrossAxisAlignment.end,
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text("Raw Y : ${_logic.rawAy.toStringAsFixed(0)}", style: const TextStyle(color: Colors.greenAccent)),
-                        Text("Filt Y: ${_logic.fAy.toStringAsFixed(0)}", style: const TextStyle(color: Colors.green)),
+                        Text("Raw Dist : ${_logic.rawVal.toStringAsFixed(0)}", style: const TextStyle(color: Colors.greenAccent)),
+                        Text("Filt Dist: ${_logic.fVal.toStringAsFixed(0)}", style: const TextStyle(color: Colors.green)),
                         Text("State : ${_logic.isHigh ? "UP" : "DOWN"}", style: const TextStyle(color: Colors.orangeAccent)),
                       ],
                     ),
