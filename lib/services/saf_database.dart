@@ -24,7 +24,7 @@ class SafDatabase {
 
     return openDatabase(
       path,
-      version: 1,
+      version: 3,
       onCreate: (db, _) async {
         // 1. Exercises Table (Cache)
         await db.execute('''
@@ -49,6 +49,37 @@ class SafDatabase {
             updated_at INTEGER NOT NULL
           )
         ''');
+
+        // 3. Performance Logs Table
+        await db.execute('''
+          CREATE TABLE performance_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id INTEGER NOT NULL,
+            date_time INTEGER NOT NULL,
+            time_taken_seconds INTEGER NOT NULL,
+            workout_name TEXT NOT NULL,
+            exercise_name TEXT NOT NULL,
+            reps INTEGER NOT NULL
+          )
+        ''');
+      },
+      onUpgrade: (db, oldVersion, newVersion) async {
+        if (oldVersion < 2) {
+          await db.execute('''
+            CREATE TABLE performance_logs (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              session_id INTEGER NOT NULL DEFAULT 0,
+              date_time INTEGER NOT NULL,
+              time_taken_seconds INTEGER NOT NULL DEFAULT 0,
+              workout_name TEXT NOT NULL,
+              exercise_name TEXT NOT NULL,
+              reps INTEGER NOT NULL
+            )
+          ''');
+        } else if (oldVersion < 3) {
+          await db.execute('ALTER TABLE performance_logs ADD COLUMN session_id INTEGER NOT NULL DEFAULT 0');
+          await db.execute('ALTER TABLE performance_logs ADD COLUMN time_taken_seconds INTEGER NOT NULL DEFAULT 0');
+        }
       },
     );
   }
@@ -171,5 +202,17 @@ class SafDatabase {
       where: 'id = ?',
       whereArgs: [planId],
     );
+  }
+
+  // ── Performance Logs ───────────────────────────────────────────────────
+
+  Future<void> logPerformance(Map<String, dynamic> log) async {
+    final db = await _database;
+    await db.insert('performance_logs', log);
+  }
+
+  Future<List<Map<String, dynamic>>> getPerformanceLogs() async {
+    final db = await _database;
+    return await db.query('performance_logs', orderBy: 'date_time DESC');
   }
 }

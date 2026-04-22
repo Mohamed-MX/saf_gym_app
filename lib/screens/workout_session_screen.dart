@@ -5,6 +5,7 @@ import '../ble/ble_manager.dart';
 import '../logic/rep_game_logic.dart';
 import '../models/workout_plan.dart';
 import '../services/muscle_wiki_service.dart';
+import '../services/saf_database.dart';
 import '../theme/app_theme.dart';
 import 'exercise_detail_screen.dart';
 
@@ -35,9 +36,14 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
   bool _bleConnected = false;
   bool _isTracking = false;
 
+  late final int _sessionId;
+  late DateTime _lastSetEndTime;
+
   @override
   void initState() {
     super.initState();
+    _sessionId = DateTime.now().millisecondsSinceEpoch;
+    _lastSetEndTime = DateTime.now();
     _completedSets =
         List.filled(widget.day.exercises.length, 0);
     _initBle();
@@ -86,10 +92,24 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
 
   void _completeSet() {
     if (_completedSets[_currentIndex] < _current.sets) {
+      final int repsDone = _isTracking && _logic.reps > 0 ? _logic.reps : _current.reps;
+      final now = DateTime.now();
+      final timeTaken = now.difference(_lastSetEndTime).inSeconds;
+      
+      SafDatabase.instance.logPerformance({
+        'session_id': _sessionId,
+        'date_time': now.millisecondsSinceEpoch,
+        'time_taken_seconds': timeTaken < 0 ? 0 : timeTaken,
+        'workout_name': widget.planName,
+        'exercise_name': _current.name,
+        'reps': repsDone,
+      });
+
       setState(() {
         _completedSets[_currentIndex]++;
         _logic.reset();
         _isTracking = false;
+        _lastSetEndTime = DateTime.now();
       });
     }
   }
@@ -102,6 +122,7 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
         _currentIndex++;
         _logic.reset();
         _isTracking = false;
+        _lastSetEndTime = DateTime.now();
       });
     }
   }
@@ -112,6 +133,7 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
         _currentIndex--;
         _logic.reset();
         _isTracking = false;
+        _lastSetEndTime = DateTime.now();
       });
     }
   }
@@ -242,7 +264,8 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
           ),
         ],
       ),
-      body: Padding(
+      body: SafeArea(
+        child: Padding(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -327,6 +350,7 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
             ),
           ],
         ),
+      ),
       ),
     );
   }

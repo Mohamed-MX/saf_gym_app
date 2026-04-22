@@ -14,6 +14,7 @@ import 'ai_workout_plan_screen.dart';
 import 'rep_game_screen.dart';
 import 'workout_plan_editor_screen.dart';
 import 'workout_plans_screen.dart';
+import 'performance_dashboard_screen.dart';
 
 // ── Changed to StatefulWidget to safely handle the scan on startup ──
 class HomeScreen extends StatefulWidget {
@@ -70,7 +71,9 @@ class _HomeView extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: AppTheme.offWhite,
-      body: CustomScrollView(
+      body: SafeArea(
+        top: false,
+        child: CustomScrollView(
         slivers: [
           // ── Blue Header ──────────────────────────────────────────────────
           SliverToBoxAdapter(
@@ -127,7 +130,7 @@ class _HomeView extends StatelessWidget {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => const WorkoutPlansScreen(),
+                          builder: (_) => const PerformanceDashboardScreen(),
                         ),
                       );
                     },
@@ -177,6 +180,7 @@ class _HomeView extends StatelessWidget {
             ),
           ),
         ],
+      ),
       ),
     );
   }

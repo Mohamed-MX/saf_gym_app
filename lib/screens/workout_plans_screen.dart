@@ -37,7 +37,8 @@ class _WorkoutPlansView extends StatelessWidget {
         backgroundColor: AppTheme.offWhite,
         elevation: 0,
       ),
-      body: vm.isLoading
+      body: SafeArea(
+        child: vm.isLoading
           ? const Center(child: CircularProgressIndicator(color: AppTheme.primaryBlue))
           : vm.plans.isEmpty
               ? _buildEmpty(context)
@@ -69,6 +70,7 @@ class _WorkoutPlansView extends StatelessWidget {
                     },
                   ),
                 ),
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {
           await Navigator.push(
