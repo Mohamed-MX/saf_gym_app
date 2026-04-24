@@ -15,6 +15,7 @@ import 'rep_game_screen.dart';
 import 'workout_plan_editor_screen.dart';
 import 'workout_plans_screen.dart';
 import 'performance_dashboard_screen.dart';
+import 'workout_session_screen.dart';
 
 // ── Changed to StatefulWidget to safely handle the scan on startup ──
 class HomeScreen extends StatefulWidget {
@@ -155,12 +156,13 @@ class _HomeView extends StatelessWidget {
                     todayWorkout: todayWorkout,
                     isLoadingPlans: plansVm.isLoading,
                     onStart: () {
-                      if (todayPlan != null) {
+                      if (todayPlan != null && todayWorkout != null) {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (_) => WorkoutPlanEditorScreen(
-                              existingPlan: todayPlan,
+                            builder: (_) => WorkoutSessionScreen(
+                              day: todayWorkout!,
+                              planName: todayPlan!.name,
                             ),
                           ),
                         );

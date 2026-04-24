@@ -281,7 +281,6 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
                 exercise: _current,
                 completedSets: _completedSets[_currentIndex],
                 currentReps: _logic.reps,
-                ballY: _logic.ballY,
                 bleConnected: _bleConnected,
                 isTracking: _isTracking,
                 onStartTracking: _startTracking,
@@ -398,7 +397,6 @@ class _ExerciseCard extends StatelessWidget {
   final PlannedExercise exercise;
   final int completedSets;
   final int currentReps;
-  final double ballY;
   final bool bleConnected;
   final bool isTracking;
   final VoidCallback onStartTracking;
@@ -408,7 +406,6 @@ class _ExerciseCard extends StatelessWidget {
     required this.exercise,
     required this.completedSets,
     required this.currentReps,
-    required this.ballY,
     required this.bleConnected,
     required this.isTracking,
     required this.onStartTracking,
@@ -510,9 +507,13 @@ class _ExerciseCard extends StatelessWidget {
 
           const SizedBox(height: 16),
           Expanded(
-            child: CustomPaint(
-              painter: _MiniGamePainter(ballY: ballY),
-              size: const Size(double.infinity, double.infinity),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: Image.asset(
+                'assets/flapppy-gym.gif',
+                fit: BoxFit.cover,
+                width: double.infinity,
+              ),
             ),
           ),
           const SizedBox(height: 16),
@@ -692,45 +693,3 @@ class _Divider extends StatelessWidget {
   }
 }
 
-// ── Mini Game Painter ────────────────────────────────────────────────────────
-
-class _MiniGamePainter extends CustomPainter {
-  final double ballY;
-
-  _MiniGamePainter({required this.ballY});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    // Draw background
-    final bgPaint = Paint()
-      ..color = AppTheme.charcoal
-      ..style = PaintingStyle.fill;
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-          Rect.fromLTWH(0, 0, size.width, size.height), const Radius.circular(16)),
-      bgPaint,
-    );
-
-    // Draw ball
-    final ballX = size.width / 2;
-    // Map 0.0 -> 1.0 to height with some padding
-    final paddingY = 24.0;
-    final usableHeight = size.height - (paddingY * 2);
-    final bY = paddingY + (usableHeight * ballY);
-
-    final glowPaint = Paint()
-      ..color = AppTheme.primaryBlue.withValues(alpha: 0.3)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 12);
-    canvas.drawCircle(Offset(ballX, bY), 24, glowPaint);
-
-    final ballPaint = Paint()
-      ..shader = RadialGradient(
-        colors: [AppTheme.primaryBlue, const Color(0xFF1a7fe8)],
-      ).createShader(Rect.fromCircle(center: Offset(ballX, bY), radius: 18));
-    canvas.drawCircle(Offset(ballX, bY), 18, ballPaint);
-  }
-
-  @override
-  bool shouldRepaint(covariant _MiniGamePainter oldDelegate) =>
-      oldDelegate.ballY != ballY;
-}
