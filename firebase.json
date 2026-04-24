@@ -1,0 +1,1 @@
+{"flutter":{"platforms":{"android":{"default":{"projectId":"saf-gym-app","appId":"1:442557458233:android:b24460da636d10a4ebeae8","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"saf-gym-app","configurations":{"android":"1:442557458233:android:b24460da636d10a4ebeae8","ios":"1:442557458233:ios:4032bc250c96d21eebeae8"}}}}}}
