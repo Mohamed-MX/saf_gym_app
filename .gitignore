@@ -46,3 +46,4 @@ app.*.map.json
 
 # Environment secrets — never commit the real .env
 .env
+lib/firebase_options.dart
