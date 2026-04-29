@@ -5,7 +5,6 @@ import 'theme/app_theme.dart';
 import 'screens/splash_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/performance_dashboard_screen.dart';
-import 'screens/muscle_selection_screen.dart';
 import 'screens/workout_plans_screen.dart';
 import 'ble/ble_manager.dart';
 
@@ -34,7 +33,6 @@ class SAFApp extends StatelessWidget {
       routes: {
         '/': (context) => const SplashScreen(),
         '/main': (context) => const MainShell(),
-        '/muscle-select': (context) => const MuscleSelectionScreen(),
       },
     );
   }
