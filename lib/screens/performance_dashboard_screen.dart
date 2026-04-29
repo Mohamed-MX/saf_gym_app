@@ -277,14 +277,11 @@ class _PerformanceDashboardScreenState extends State<PerformanceDashboardScreen>
       body: SafeArea(
         child: _isLoading
           ? const Center(child: CircularProgressIndicator(color: AppTheme.primaryBlue))
-          : Column(
-              children: [
-                Expanded(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
+          : SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
                   // Filter Chips
                   SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
@@ -452,42 +449,40 @@ class _PerformanceDashboardScreenState extends State<PerformanceDashboardScreen>
                             },
                           ),
 
+                  // Summary Stats below
+                  const SizedBox(height: 20),
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 24),
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primaryBlue,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppTheme.primaryBlue.withValues(alpha: 0.3),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Summary ($_filter)', style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.w800, color: AppTheme.white)),
+                        const SizedBox(height: 12),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          children: [
+                            Expanded(child: _SummaryItem(label: 'Reps', value: '$_totalReps')),
+                            Expanded(child: _SummaryItem(label: 'Workouts', value: '$_workoutsStarted')),
+                            Expanded(child: _SummaryItem(label: 'Time Spent', value: _formatTime(_totalTimeSeconds))),
+                          ],
+                        ),
                       ],
                     ),
                   ),
-                ),
-                // Summary Stats below
-                Container(
-                  margin: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: AppTheme.primaryBlue,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppTheme.primaryBlue.withValues(alpha: 0.3),
-                        blurRadius: 12,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Summary ($_filter)', style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.w800, color: AppTheme.white)),
-                      const SizedBox(height: 12),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                        children: [
-                          Expanded(child: _SummaryItem(label: 'Reps', value: '$_totalReps')),
-                          Expanded(child: _SummaryItem(label: 'Workouts', value: '$_workoutsStarted')),
-                          Expanded(child: _SummaryItem(label: 'Time Spent', value: _formatTime(_totalTimeSeconds))),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
       ),
     );

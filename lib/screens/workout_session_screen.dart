@@ -307,67 +307,11 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
                 onStartTracking: _startTracking,
                 onCompleteSet: _completeSet,
                 onWeightChanged: _updateWeight,
+                onPrev: _prev,
+                onNext: _next,
+                isFirst: _currentIndex == 0,
+                isLast: _isLast,
               ),
-            ),
-            const SizedBox(height: 20),
-
-            // ── Navigation row ────────────────────────────────────────────
-            Row(
-              children: [
-                // Previous button
-                if (_currentIndex > 0)
-                  Expanded(
-                    flex: 2,
-                    child: OutlinedButton.icon(
-                      onPressed: _prev,
-                      icon: const Icon(Icons.arrow_back_ios_new_rounded,
-                          size: 16),
-                      label: Text('Back',
-                          style: GoogleFonts.outfit(
-                              fontWeight: FontWeight.w600)),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppTheme.charcoal,
-                        side: BorderSide(color: AppTheme.lightGrey),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                            borderRadius:
-                                BorderRadius.circular(AppTheme.radiusFull)),
-                      ),
-                    ),
-                  ),
-                if (_currentIndex > 0) const SizedBox(width: 12),
-
-                // Next / Finish button
-                Expanded(
-                  flex: 3,
-                  child: ElevatedButton.icon(
-                    onPressed: _allSetsCompleted ? _next : null,
-                    icon: Icon(
-                      _isLast
-                          ? Icons.check_circle_outline_rounded
-                          : Icons.arrow_forward_ios_rounded,
-                      size: 16,
-                    ),
-                    label: Text(
-                      _isLast ? 'Finish Workout' : 'Next Exercise',
-                      style: GoogleFonts.outfit(
-                          fontWeight: FontWeight.w700, fontSize: 15),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.primaryBlue,
-                      foregroundColor: AppTheme.white,
-                      disabledBackgroundColor:
-                          AppTheme.primaryBlue.withValues(alpha: 0.35),
-                      disabledForegroundColor:
-                          AppTheme.white.withValues(alpha: 0.6),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                          borderRadius:
-                              BorderRadius.circular(AppTheme.radiusFull)),
-                    ),
-                  ),
-                ),
-              ],
             ),
           ],
         ),
@@ -424,6 +368,10 @@ class _ExerciseCard extends StatelessWidget {
   final VoidCallback onStartTracking;
   final VoidCallback onCompleteSet;
   final void Function(int setIndex, double newWeight)? onWeightChanged;
+  final VoidCallback onPrev;
+  final VoidCallback onNext;
+  final bool isFirst;
+  final bool isLast;
 
   const _ExerciseCard({
     required this.exercise,
@@ -434,6 +382,10 @@ class _ExerciseCard extends StatelessWidget {
     required this.onStartTracking,
     required this.onCompleteSet,
     this.onWeightChanged,
+    required this.onPrev,
+    required this.onNext,
+    required this.isFirst,
+    required this.isLast,
   });
 
   @override
@@ -455,48 +407,65 @@ class _ExerciseCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   // Icon / Thumbnail
-                  GestureDetector(
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => ExerciseDetailScreen(
-                            exercise: MuscleWikiExercise(
-                              id: exercise.exerciseId,
-                              name: exercise.name,
-                              primaryMuscles: exercise.muscleGroup != null ? [exercise.muscleGroup!] : [],
-                              steps: [],
-                              thumbnailUrl: exercise.thumbnailUrl,
-                            ),
-                          ),
-                        ),
-                      );
-                    },
-                    child: Container(
-                      width: 120,
-                      height: 120,
-                      decoration: BoxDecoration(
-                        color: exercise.thumbnailUrl == null ? AppTheme.primaryBlue : AppTheme.lightGrey,
-                        borderRadius: BorderRadius.circular(20),
-                        image: exercise.thumbnailUrl != null
-                            ? DecorationImage(
-                                image: NetworkImage(exercise.thumbnailUrl!),
-                                fit: BoxFit.cover,
-                              )
-                            : null,
-                        boxShadow: [
-                          if (exercise.thumbnailUrl != null)
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.1),
-                              blurRadius: 8,
-                              offset: const Offset(0, 4),
-                            ),
-                        ],
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      IconButton(
+                        onPressed: isFirst ? null : onPrev,
+                        icon: const Icon(Icons.arrow_back_ios_new_rounded),
+                        color: isFirst ? Colors.transparent : AppTheme.mediumGrey,
                       ),
-                      child: exercise.thumbnailUrl == null
-                          ? const Icon(Icons.fitness_center_rounded, color: AppTheme.white, size: 40)
-                          : null,
-                    ),
+                      const SizedBox(width: 8),
+                      GestureDetector(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => ExerciseDetailScreen(
+                                exercise: MuscleWikiExercise(
+                                  id: exercise.exerciseId,
+                                  name: exercise.name,
+                                  primaryMuscles: exercise.muscleGroup != null ? [exercise.muscleGroup!] : [],
+                                  steps: [],
+                                  thumbnailUrl: exercise.thumbnailUrl,
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                        child: Container(
+                          width: 120,
+                          height: 120,
+                          decoration: BoxDecoration(
+                            color: exercise.thumbnailUrl == null ? AppTheme.primaryBlue : AppTheme.lightGrey,
+                            borderRadius: BorderRadius.circular(20),
+                            image: exercise.thumbnailUrl != null
+                                ? DecorationImage(
+                                    image: NetworkImage(exercise.thumbnailUrl!),
+                                    fit: BoxFit.cover,
+                                  )
+                                : null,
+                            boxShadow: [
+                              if (exercise.thumbnailUrl != null)
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.1),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 4),
+                                ),
+                            ],
+                          ),
+                          child: exercise.thumbnailUrl == null
+                              ? const Icon(Icons.fitness_center_rounded, color: AppTheme.white, size: 40)
+                              : null,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton(
+                        onPressed: onNext,
+                        icon: Icon(isLast ? Icons.check_circle_outline_rounded : Icons.arrow_forward_ios_rounded),
+                        color: isLast ? Colors.green : AppTheme.mediumGrey,
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 20),
 
@@ -690,9 +659,9 @@ class _ExerciseCard extends StatelessWidget {
               const SizedBox(width: 12),
               Expanded(
                 child: ElevatedButton(
-                  onPressed: remaining > 0 ? onCompleteSet : null,
+                  onPressed: remaining > 0 ? onCompleteSet : onNext,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.primaryBlue,
+                    backgroundColor: remaining > 0 ? AppTheme.primaryBlue : Colors.green,
                     foregroundColor: AppTheme.white,
                     disabledBackgroundColor: Colors.green.withValues(alpha: 0.15),
                     disabledForegroundColor: Colors.green,
@@ -704,13 +673,13 @@ class _ExerciseCard extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Icon(
-                        remaining > 0 ? Icons.check_rounded : Icons.check_circle_rounded,
+                        remaining > 0 ? Icons.check_rounded : (isLast ? Icons.emoji_events_rounded : Icons.arrow_forward_ios_rounded),
                         size: 20,
                       ),
                       const SizedBox(width: 8),
                       Flexible(
                         child: Text(
-                          remaining > 0 ? 'Complete ($remaining)' : 'Done ✓',
+                          remaining > 0 ? 'Complete ($remaining)' : (isLast ? 'Finish Workout' : 'Next Exercise'),
                           style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 14),
                           overflow: TextOverflow.ellipsis,
                         ),
