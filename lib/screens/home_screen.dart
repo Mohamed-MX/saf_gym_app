@@ -155,9 +155,9 @@ class _HomeView extends StatelessWidget {
                     planName: todayPlan?.name,
                     todayWorkout: todayWorkout,
                     isLoadingPlans: plansVm.isLoading,
-                    onStart: () {
+                    onStart: () async {
                       if (todayPlan != null && todayWorkout != null) {
-                        Navigator.push(
+                        await Navigator.push(
                           context,
                           MaterialPageRoute(
                             builder: (_) => WorkoutSessionScreen(
@@ -166,6 +166,9 @@ class _HomeView extends StatelessWidget {
                             ),
                           ),
                         );
+                        if (context.mounted) {
+                          context.read<HomeViewModel>().loadStats();
+                        }
                       } else {
                         Navigator.push(
                           context,
@@ -371,21 +374,23 @@ class _HomeHeaderState extends State<_HomeHeader> {
                   _StatCard(
                     icon: Icons.local_fire_department_rounded,
                     iconColor: Colors.redAccent,
-                    value: '7',
+                    value: widget.vm.dayStreak.toString(),
                     label: 'Day streak',
                   ),
                   const SizedBox(width: 12),
                   _StatCard(
                     icon: Icons.fitness_center_rounded,
                     iconColor: AppTheme.charcoal,
-                    value: '900',
+                    value: widget.vm.totalReps.toString(),
                     label: 'Total Reps',
                   ),
                   const SizedBox(width: 12),
                   _StatCard(
                     icon: Icons.timer_rounded,
                     iconColor: AppTheme.primaryBlue,
-                    value: '5k',
+                    value: widget.vm.totalMinutes >= 1000 
+                        ? '${(widget.vm.totalMinutes / 1000).toStringAsFixed(1)}k' 
+                        : widget.vm.totalMinutes.toString(),
                     label: 'Minutes',
                   ),
                 ],
