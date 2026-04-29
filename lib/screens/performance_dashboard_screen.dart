@@ -277,11 +277,14 @@ class _PerformanceDashboardScreenState extends State<PerformanceDashboardScreen>
       body: SafeArea(
         child: _isLoading
           ? const Center(child: CircularProgressIndicator(color: AppTheme.primaryBlue))
-          : Padding(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
+          : Column(
+              children: [
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
                   // Filter Chips
                   SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
@@ -384,12 +387,17 @@ class _PerformanceDashboardScreenState extends State<PerformanceDashboardScreen>
                     style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.w800, color: AppTheme.charcoal),
                   ),
                   const SizedBox(height: 12),
-                  Expanded(
-                    child: _sessions.isEmpty
-                        ? const Center(child: Text('No workouts logged in this time frame.', style: TextStyle(color: AppTheme.mediumGrey)))
-                        : ListView.builder(
-                            itemCount: _sessions.length,
-                            itemBuilder: (context, index) {
+                  if (_sessions.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 40),
+                      child: Center(child: Text('No workouts logged in this time frame.', style: TextStyle(color: AppTheme.mediumGrey))),
+                    )
+                  else
+                    ListView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: _sessions.length,
+                      itemBuilder: (context, index) {
                               final session = _sessions[index];
                               return Card(
                                 margin: const EdgeInsets.only(bottom: 12),
@@ -443,42 +451,43 @@ class _PerformanceDashboardScreenState extends State<PerformanceDashboardScreen>
                               );
                             },
                           ),
-                  ),
 
-                  // Summary Stats below
-                  const SizedBox(height: 20),
-                  Container(
-                    margin: const EdgeInsets.only(bottom: 24),
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: AppTheme.primaryBlue,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppTheme.primaryBlue.withValues(alpha: 0.3),
-                          blurRadius: 12,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Summary ($_filter)', style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.w800, color: AppTheme.white)),
-                        const SizedBox(height: 12),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                          children: [
-                            Expanded(child: _SummaryItem(label: 'Reps', value: '$_totalReps')),
-                            Expanded(child: _SummaryItem(label: 'Workouts', value: '$_workoutsStarted')),
-                            Expanded(child: _SummaryItem(label: 'Time Spent', value: _formatTime(_totalTimeSeconds))),
-                          ],
-                        ),
                       ],
                     ),
                   ),
-                ],
-              ),
+                ),
+                // Summary Stats below
+                Container(
+                  margin: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryBlue,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppTheme.primaryBlue.withValues(alpha: 0.3),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Summary ($_filter)', style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.w800, color: AppTheme.white)),
+                      const SizedBox(height: 12),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          Expanded(child: _SummaryItem(label: 'Reps', value: '$_totalReps')),
+                          Expanded(child: _SummaryItem(label: 'Workouts', value: '$_workoutsStarted')),
+                          Expanded(child: _SummaryItem(label: 'Time Spent', value: _formatTime(_totalTimeSeconds))),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
       ),
     );
