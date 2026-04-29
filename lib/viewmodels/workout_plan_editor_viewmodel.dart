@@ -86,7 +86,14 @@ class WorkoutPlanEditorViewModel extends ChangeNotifier {
   }
 
   void updateSets(String day, int index, int sets) {
-    _dayExercises[day]?[index].sets = sets;
+    if (sets < 1) return;
+    _dayExercises[day]?[index].updateSets(sets);
+    notifyListeners();
+  }
+
+  void updateWeight(String day, int index, int setIndex, double newWeight) {
+    if (newWeight < 0) return;
+    _dayExercises[day]?[index].weights[setIndex] = newWeight;
     notifyListeners();
   }
 

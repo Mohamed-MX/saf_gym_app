@@ -3,6 +3,9 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:share_plus/share_plus.dart';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
+import 'package:fl_chart/fl_chart.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
 
 import '../services/saf_database.dart';
 import '../theme/app_theme.dart';
@@ -25,6 +28,7 @@ class _PerformanceDashboardScreenState extends State<PerformanceDashboardScreen>
   int _workoutsStarted = 0;
   int _exercisesDone = 0;
   int _totalTimeSeconds = 0;
+  double _totalWeightLifted = 0.0;
   List<_SessionData> _sessions = [];
 
   @override
@@ -67,6 +71,7 @@ class _PerformanceDashboardScreenState extends State<PerformanceDashboardScreen>
     _workoutsStarted = 0;
     _exercisesDone = 0;
     _totalTimeSeconds = 0;
+    _totalWeightLifted = 0.0;
     _sessions.clear();
 
     final Map<int, _SessionData> sessionMap = {};
@@ -78,10 +83,12 @@ class _PerformanceDashboardScreenState extends State<PerformanceDashboardScreen>
       final exName = log['exercise_name'] as String;
       final workoutName = log['workout_name'] as String;
       final timeTaken = log['time_taken_seconds'] as int? ?? 0;
+      final weight = (log['weight'] as num?)?.toDouble() ?? 0.0;
       final dt = DateTime.fromMillisecondsSinceEpoch(log['date_time']);
       
       _totalReps += reps;
       _totalTimeSeconds += timeTaken;
+      _totalWeightLifted += (reps * weight);
       uniqueExercises.add(exName);
 
       // Use sessionId as grouping key. Fallback to daily grouping if 0.
@@ -102,6 +109,10 @@ class _PerformanceDashboardScreenState extends State<PerformanceDashboardScreen>
 
       final session = sessionMap[effectiveSessionId]!;
       session.totalTimeSeconds += timeTaken;
+      session.totalWeightLifted += (reps * weight);
+      if (weight > session.maxWeight) {
+        session.maxWeight = weight;
+      }
 
       // Find or create exercise in session
       _ExerciseLogData? exData;
@@ -119,6 +130,7 @@ class _PerformanceDashboardScreenState extends State<PerformanceDashboardScreen>
       exData.sets += 1;
       exData.reps += reps;
       exData.timeTakenSeconds += timeTaken;
+      exData.weights.add(weight);
       
       // Update timestamp to the earliest set's timestamp
       if (dt.isBefore(exData.timestamp)) {
@@ -149,34 +161,103 @@ class _PerformanceDashboardScreenState extends State<PerformanceDashboardScreen>
   }
 
   Future<void> _exportData() async {
-    final buffer = StringBuffer();
-    buffer.writeln("Performance Metrics ($_filter)");
-    buffer.writeln("----------------------------------");
-    buffer.writeln("Total Reps: $_totalReps");
-    buffer.writeln("Workouts Started: $_workoutsStarted");
-    buffer.writeln("Exercises Done: $_exercisesDone");
-    buffer.writeln("Total Time Spent: ${_formatTime(_totalTimeSeconds)}");
-    buffer.writeln("");
+    final pdf = pw.Document();
     
-    for (var session in _sessions) {
-      buffer.writeln("Workout Session: ${session.workoutName}");
-      buffer.writeln("Date: ${_formatDateTime(session.date)}");
-      buffer.writeln("Total Time: ${_formatTime(session.totalTimeSeconds)}");
-      buffer.writeln("Exercises:");
-      for (var ex in session.exercises) {
-        buffer.writeln("  - ${ex.name}: ${ex.sets} sets, ${ex.reps} reps");
-        buffer.writeln("    Time: ${_formatDateTime(ex.timestamp)} | Duration: ${_formatTime(ex.timeTakenSeconds)}");
-      }
-      buffer.writeln("");
+    // Prepare chart data for PDF
+    final chartData = _sessions.reversed.toList();
+    
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        build: (pw.Context context) {
+          return pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Text("Performance Metrics ($_filter)", style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold)),
+              pw.SizedBox(height: 20),
+              pw.Text("Total Reps: $_totalReps"),
+              pw.Text("Workouts Started: $_workoutsStarted"),
+              pw.Text("Exercises Done: $_exercisesDone"),
+              pw.Text("Total Weight Lifted: ${_totalWeightLifted.toStringAsFixed(1)} kg"),
+              pw.Text("Total Time Spent: ${_formatTime(_totalTimeSeconds)}"),
+              pw.SizedBox(height: 20),
+              pw.Text("Workout Sessions:", style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
+              pw.SizedBox(height: 10),
+              ..._sessions.map((session) {
+                return pw.Container(
+                  margin: const pw.EdgeInsets.only(bottom: 10),
+                  child: pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Text("${session.workoutName} - ${_formatDateTime(session.date)}", style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                      pw.Text("Total Time: ${_formatTime(session.totalTimeSeconds)} | Weight Lifted: ${session.totalWeightLifted.toStringAsFixed(1)} kg"),
+                      pw.Text("Max Weight: ${session.maxWeight} kg", style: pw.TextStyle(color: PdfColors.blueGrey)),
+                      pw.SizedBox(height: 4),
+                      ...session.exercises.map((ex) {
+                        final maxW = ex.weights.isEmpty ? 0 : ex.weights.reduce((a, b) => a > b ? a : b);
+                        return pw.Text("  - ${ex.name}: ${ex.sets} sets, ${ex.reps} reps (Max Weight: $maxW kg)");
+                      }).toList(),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ],
+          );
+        },
+      ),
+    );
+
+    // Add Graph Page
+    if (chartData.isNotEmpty) {
+      final double maxVal = chartData.fold<double>(0.0, (m, e) => m > e.maxWeight ? m : e.maxWeight);
+      final double yMax = maxVal == 0 ? 10.0 : maxVal * 1.2;
+      
+      pdf.addPage(
+        pw.Page(
+          build: (context) {
+            return pw.Column(
+              children: [
+                pw.Text("Weight Progression (Max kg per session)", style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold)),
+                pw.SizedBox(height: 20),
+                pw.Expanded(
+                  child: pw.Chart(
+                    grid: pw.CartesianGrid(
+                      xAxis: pw.FixedAxis(
+                        chartData.map((e) => e.date.millisecondsSinceEpoch.toDouble()).toList(),
+                        format: (v) => DateTime.fromMillisecondsSinceEpoch(v.toInt()).day.toString(),
+                        ticks: true,
+                      ),
+                      yAxis: pw.FixedAxis(
+                        List.generate(6, (i) => (yMax / 5) * i),
+                        format: (v) => v.toInt().toString(),
+                        ticks: true,
+                      ),
+                    ),
+                    datasets: [
+                      pw.LineDataSet(
+                        data: List.generate(chartData.length, (i) {
+                          return pw.PointChartValue(chartData[i].date.millisecondsSinceEpoch.toDouble(), chartData[i].maxWeight);
+                        }),
+                        color: PdfColors.blue,
+                        lineWidth: 2,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            );
+          }
+        )
+      );
     }
 
     final directory = await getTemporaryDirectory();
-    final file = File('${directory.path}/performance_$_filter.txt');
-    await file.writeAsString(buffer.toString());
+    final file = File('${directory.path}/performance_$_filter.pdf');
+    await file.writeAsBytes(await pdf.save());
 
     await SharePlus.instance.share(ShareParams(
       files: [XFile(file.path)],
-      text: 'My Performance Metrics',
+      text: 'My Performance PDF Report',
     ));
   }
 
@@ -238,8 +319,8 @@ class _PerformanceDashboardScreenState extends State<PerformanceDashboardScreen>
                   // Export Button
                   ElevatedButton.icon(
                     onPressed: _exportData,
-                    icon: const Icon(Icons.download_rounded, size: 20),
-                    label: Text('Export Metrics', style: GoogleFonts.outfit(fontWeight: FontWeight.w700)),
+                    icon: const Icon(Icons.picture_as_pdf_rounded, size: 20),
+                    label: Text('Export PDF', style: GoogleFonts.outfit(fontWeight: FontWeight.w700)),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppTheme.charcoal,
                       foregroundColor: AppTheme.white,
@@ -248,6 +329,54 @@ class _PerformanceDashboardScreenState extends State<PerformanceDashboardScreen>
                     ),
                   ),
                   const SizedBox(height: 24),
+
+                  // UI Graph
+                  if (_sessions.isNotEmpty) ...[
+                    Text(
+                      'Max Weight Progression (kg)',
+                      style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.w800, color: AppTheme.charcoal),
+                    ),
+                    const SizedBox(height: 12),
+                    Container(
+                      height: 200,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: AppTheme.white,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: AppTheme.cardShadow,
+                      ),
+                      child: LineChart(
+                        LineChartData(
+                          gridData: const FlGridData(show: false),
+                          titlesData: const FlTitlesData(
+                            rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                            topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                            bottomTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)), // Hide for simplicity
+                          ),
+                          borderData: FlBorderData(show: false),
+                          lineBarsData: [
+                            LineChartBarData(
+                              spots: List.generate(_sessions.length, (i) {
+                                // Reverse sessions for chronological order
+                                final reversedIndex = _sessions.length - 1 - i;
+                                return FlSpot(i.toDouble(), _sessions[reversedIndex].maxWeight);
+                              }),
+                              isCurved: true,
+                              color: AppTheme.primaryBlue,
+                              barWidth: 3,
+                              isStrokeCapRound: true,
+                              dotData: const FlDotData(show: true),
+                              belowBarData: BarAreaData(
+                                show: true,
+                                color: AppTheme.primaryBlue.withValues(alpha: 0.1),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                  ],
 
                   // Exercise List
                   Text(
@@ -295,14 +424,16 @@ class _PerformanceDashboardScreenState extends State<PerformanceDashboardScreen>
                                                 ],
                                               ),
                                             ),
-                                            Column(
-                                              crossAxisAlignment: CrossAxisAlignment.end,
-                                              children: [
-                                                Text("${ex.sets} Sets / ${ex.reps} Reps", style: const TextStyle(fontWeight: FontWeight.w600, color: AppTheme.primaryBlue, fontSize: 13)),
-                                                const SizedBox(height: 2),
-                                                Text(_formatTime(ex.timeTakenSeconds), style: const TextStyle(fontSize: 12, color: AppTheme.mediumGrey)),
-                                              ],
-                                            ),
+                                              Column(
+                                                crossAxisAlignment: CrossAxisAlignment.end,
+                                                children: [
+                                                  Text("${ex.sets} Sets / ${ex.reps} Reps", style: const TextStyle(fontWeight: FontWeight.w600, color: AppTheme.primaryBlue, fontSize: 13)),
+                                                  const SizedBox(height: 2),
+                                                  Text("Max Weight: ${ex.weights.isEmpty ? 0 : ex.weights.reduce((a, b) => a > b ? a : b)} kg", style: const TextStyle(fontSize: 12, color: AppTheme.charcoal, fontWeight: FontWeight.bold)),
+                                                  const SizedBox(height: 2),
+                                                  Text(_formatTime(ex.timeTakenSeconds), style: const TextStyle(fontSize: 12, color: AppTheme.mediumGrey)),
+                                                ],
+                                              ),
                                           ],
                                         ),
                                       );
@@ -340,8 +471,7 @@ class _PerformanceDashboardScreenState extends State<PerformanceDashboardScreen>
                           children: [
                             Expanded(child: _SummaryItem(label: 'Reps', value: '$_totalReps')),
                             Expanded(child: _SummaryItem(label: 'Workouts', value: '$_workoutsStarted')),
-                            Expanded(child: _SummaryItem(label: 'Exercises', value: '$_exercisesDone')),
-                            Expanded(child: _SummaryItem(label: 'Time', value: _formatTime(_totalTimeSeconds))),
+                            Expanded(child: _SummaryItem(label: 'Time Spent', value: _formatTime(_totalTimeSeconds))),
                           ],
                         ),
                       ],
@@ -360,6 +490,8 @@ class _SessionData {
   final String workoutName;
   final DateTime date;
   int totalTimeSeconds = 0;
+  double totalWeightLifted = 0.0;
+  double maxWeight = 0.0;
   List<_ExerciseLogData> exercises = [];
 
   _SessionData({
@@ -375,6 +507,7 @@ class _ExerciseLogData {
   int timeTakenSeconds = 0;
   int reps = 0;
   int sets = 0;
+  List<double> weights = [];
 
   _ExerciseLogData({
     required this.name,

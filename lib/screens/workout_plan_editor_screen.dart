@@ -379,104 +379,190 @@ class _ExerciseRow extends StatelessWidget {
       decoration: const BoxDecoration(
         border: Border(bottom: BorderSide(color: Color(0xFFF0F0F0))),
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      child: Row(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Column(
         children: [
-          // Thumbnail
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: SizedBox(
-              width: 50,
-              height: 50,
-              child: exercise.thumbnailUrl != null
-                  ? Image.network(
-                      exercise.thumbnailUrl!,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, err, _) => Container(
-                        color: AppTheme.primaryBlue.withValues(alpha: 0.1),
-                        child: const Icon(Icons.fitness_center,
-                            size: 22, color: AppTheme.primaryBlue),
-                      ),
-                    )
-                  : Container(
-                      color: AppTheme.primaryBlue.withValues(alpha: 0.1),
-                      child: const Icon(Icons.fitness_center,
-                          size: 22, color: AppTheme.primaryBlue),
-                    ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          // Name + muscle
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  exercise.name,
-                  style: GoogleFonts.outfit(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: AppTheme.charcoal,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Thumbnail
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: SizedBox(
+                  width: 70,
+                  height: 70,
+                  child: exercise.thumbnailUrl != null
+                      ? Image.network(
+                          exercise.thumbnailUrl!,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, err, _) => Container(
+                            color: AppTheme.primaryBlue.withValues(alpha: 0.1),
+                            child: const Icon(Icons.fitness_center,
+                                size: 28, color: AppTheme.primaryBlue),
+                          ),
+                        )
+                      : Container(
+                          color: AppTheme.primaryBlue.withValues(alpha: 0.1),
+                          child: const Icon(Icons.fitness_center,
+                              size: 28, color: AppTheme.primaryBlue),
+                        ),
                 ),
-                if (exercise.muscleGroup != null)
-                  Text(
-                    exercise.muscleGroup!,
-                    style: const TextStyle(fontSize: 11, color: AppTheme.mediumGrey),
-                  ),
-              ],
+              ),
+              const SizedBox(width: 12),
+              // Name + muscle + sets/reps
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Name row with delete & drag
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            exercise.name,
+                            style: GoogleFonts.outfit(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: AppTheme.charcoal,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        // Delete
+                        GestureDetector(
+                          onTap: () => context
+                              .read<WorkoutPlanEditorViewModel>()
+                              .removeExerciseFromDay(day, index),
+                          child: const Icon(Icons.close, size: 20, color: AppTheme.error),
+                        ),
+                        const SizedBox(width: 16),
+                        // Drag handle
+                        ReorderableDragStartListener(
+                          index: index,
+                          child: const Icon(Icons.drag_handle, size: 24, color: AppTheme.mediumGrey),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    // Muscle row with sets/reps
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            exercise.muscleGroup ?? 'Unknown Muscle',
+                            style: const TextStyle(fontSize: 12, color: AppTheme.mediumGrey),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        // Sets / Reps
+                        _SetsRepsControl(
+                          label: 'Sets',
+                          value: exercise.sets,
+                          onDecrement: () {
+                            if (exercise.sets > 1) {
+                              context
+                                  .read<WorkoutPlanEditorViewModel>()
+                                  .updateSets(day, index, exercise.sets - 1);
+                            }
+                          },
+                          onIncrement: () {
+                            context
+                                .read<WorkoutPlanEditorViewModel>()
+                                .updateSets(day, index, exercise.sets + 1);
+                          },
+                        ),
+                        const SizedBox(width: 12),
+                        _SetsRepsControl(
+                          label: 'Reps',
+                          value: exercise.reps,
+                          onDecrement: () {
+                            if (exercise.reps > 1) {
+                              context
+                                  .read<WorkoutPlanEditorViewModel>()
+                                  .updateReps(day, index, exercise.reps - 1);
+                            }
+                          },
+                          onIncrement: () {
+                            context
+                                .read<WorkoutPlanEditorViewModel>()
+                                .updateReps(day, index, exercise.reps + 1);
+                          },
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          if (exercise.sets > 0)
+            Padding(
+              padding: const EdgeInsets.only(top: 4.0, left: 82), // align with text (70 image + 12 gap)
+              child: Column(
+                children: List.generate(exercise.sets, (i) {
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Row(
+                      children: [
+                        Text('Set ${i + 1} Weight', style: const TextStyle(fontSize: 12, color: AppTheme.mediumGrey)),
+                        const Spacer(),
+                        _WeightControl(
+                          value: exercise.weights[i],
+                          onDecrement: () {
+                            if (exercise.weights[i] > 0) {
+                              context.read<WorkoutPlanEditorViewModel>().updateWeight(day, index, i, exercise.weights[i] - 1.0);
+                            }
+                          },
+                          onIncrement: () {
+                            context.read<WorkoutPlanEditorViewModel>().updateWeight(day, index, i, exercise.weights[i] + 1.0);
+                          },
+                        ),
+                        const SizedBox(width: 4),
+                        const Text('KG', style: TextStyle(fontSize: 10, color: AppTheme.mediumGrey, fontWeight: FontWeight.bold)),
+                        const SizedBox(width: 36), // Align with drag handle
+                      ],
+                    ),
+                  );
+                }),
+              ),
             ),
-          ),
-          // Sets / Reps
-          _SetsRepsControl(
-            label: 'Sets',
-            value: exercise.sets,
-            onDecrement: () {
-              if (exercise.sets > 1) {
-                context
-                    .read<WorkoutPlanEditorViewModel>()
-                    .updateSets(day, index, exercise.sets - 1);
-              }
-            },
-            onIncrement: () {
-              context
-                  .read<WorkoutPlanEditorViewModel>()
-                  .updateSets(day, index, exercise.sets + 1);
-            },
-          ),
-          const SizedBox(width: 6),
-          _SetsRepsControl(
-            label: 'Reps',
-            value: exercise.reps,
-            onDecrement: () {
-              if (exercise.reps > 1) {
-                context
-                    .read<WorkoutPlanEditorViewModel>()
-                    .updateReps(day, index, exercise.reps - 1);
-              }
-            },
-            onIncrement: () {
-              context
-                  .read<WorkoutPlanEditorViewModel>()
-                  .updateReps(day, index, exercise.reps + 1);
-            },
-          ),
-          const SizedBox(width: 4),
-          // Delete
-          IconButton(
-            icon: const Icon(Icons.close, size: 18),
-            color: AppTheme.error,
-            padding: EdgeInsets.zero,
-            onPressed: () => context
-                .read<WorkoutPlanEditorViewModel>()
-                .removeExerciseFromDay(day, index),
-          ),
-          // Drag handle
-          const Icon(Icons.drag_handle, size: 18, color: AppTheme.mediumGrey),
         ],
       ),
+    );
+  }
+}
+
+class _WeightControl extends StatelessWidget {
+  final double value;
+  final VoidCallback onDecrement;
+  final VoidCallback onIncrement;
+
+  const _WeightControl({
+    required this.value,
+    required this.onDecrement,
+    required this.onIncrement,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _Btn(icon: Icons.remove, onTap: onDecrement),
+        SizedBox(
+          width: 36,
+          child: Text(
+            value.toStringAsFixed(value.truncateToDouble() == value ? 0 : 1),
+            textAlign: TextAlign.center,
+            style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 13),
+          ),
+        ),
+        _Btn(icon: Icons.add, onTap: onIncrement),
+      ],
     );
   }
 }

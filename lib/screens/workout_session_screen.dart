@@ -103,6 +103,7 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
         'workout_name': widget.planName,
         'exercise_name': _current.name,
         'reps': repsDone,
+        'weight': _current.weights[_completedSets[_currentIndex]],
       });
 
       setState(() {
@@ -111,6 +112,26 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
         _isTracking = false;
         _lastSetEndTime = DateTime.now();
       });
+    }
+  }
+
+  void _updateWeight(int setIndex, double newWeight) async {
+    setState(() {
+      _current.weights[setIndex] = newWeight;
+    });
+
+    final plans = await SafDatabase.instance.getPlans();
+    final plan = plans.where((p) => p.name == widget.planName).firstOrNull;
+    if (plan != null) {
+      for (final day in plan.days) {
+        if (day.dayName == widget.day.dayName) {
+          final idx = day.exercises.indexWhere((e) => e.exerciseId == _current.exerciseId);
+          if (idx != -1) {
+            day.exercises[idx].weights[setIndex] = newWeight;
+          }
+        }
+      }
+      await SafDatabase.instance.savePlan(plan);
     }
   }
 
@@ -285,6 +306,7 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
                 isTracking: _isTracking,
                 onStartTracking: _startTracking,
                 onCompleteSet: _completeSet,
+                onWeightChanged: _updateWeight,
               ),
             ),
             const SizedBox(height: 20),
@@ -401,6 +423,7 @@ class _ExerciseCard extends StatelessWidget {
   final bool isTracking;
   final VoidCallback onStartTracking;
   final VoidCallback onCompleteSet;
+  final void Function(int setIndex, double newWeight)? onWeightChanged;
 
   const _ExerciseCard({
     required this.exercise,
@@ -410,6 +433,7 @@ class _ExerciseCard extends StatelessWidget {
     required this.isTracking,
     required this.onStartTracking,
     required this.onCompleteSet,
+    this.onWeightChanged,
   });
 
   @override
@@ -424,165 +448,216 @@ class _ExerciseCard extends StatelessWidget {
         boxShadow: AppTheme.cardShadow,
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // Icon / Thumbnail
-          GestureDetector(
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => ExerciseDetailScreen(
-                    exercise: MuscleWikiExercise(
-                      id: exercise.exerciseId,
-                      name: exercise.name,
-                      primaryMuscles: exercise.muscleGroup != null ? [exercise.muscleGroup!] : [],
-                      steps: [],
-                      thumbnailUrl: exercise.thumbnailUrl,
+          Expanded(
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  // Icon / Thumbnail
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => ExerciseDetailScreen(
+                            exercise: MuscleWikiExercise(
+                              id: exercise.exerciseId,
+                              name: exercise.name,
+                              primaryMuscles: exercise.muscleGroup != null ? [exercise.muscleGroup!] : [],
+                              steps: [],
+                              thumbnailUrl: exercise.thumbnailUrl,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                    child: Container(
+                      width: 120,
+                      height: 120,
+                      decoration: BoxDecoration(
+                        color: exercise.thumbnailUrl == null ? AppTheme.primaryBlue : AppTheme.lightGrey,
+                        borderRadius: BorderRadius.circular(20),
+                        image: exercise.thumbnailUrl != null
+                            ? DecorationImage(
+                                image: NetworkImage(exercise.thumbnailUrl!),
+                                fit: BoxFit.cover,
+                              )
+                            : null,
+                        boxShadow: [
+                          if (exercise.thumbnailUrl != null)
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.1),
+                              blurRadius: 8,
+                              offset: const Offset(0, 4),
+                            ),
+                        ],
+                      ),
+                      child: exercise.thumbnailUrl == null
+                          ? const Icon(Icons.fitness_center_rounded, color: AppTheme.white, size: 40)
+                          : null,
                     ),
                   ),
-                ),
-              );
-            },
-            child: Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                color: exercise.thumbnailUrl == null ? AppTheme.primaryBlue : AppTheme.lightGrey,
-                borderRadius: BorderRadius.circular(20),
-                image: exercise.thumbnailUrl != null
-                    ? DecorationImage(
-                        image: NetworkImage(exercise.thumbnailUrl!),
-                        fit: BoxFit.cover,
-                      )
-                    : null,
-                boxShadow: [
-                  if (exercise.thumbnailUrl != null)
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.1),
-                      blurRadius: 8,
-                      offset: const Offset(0, 4),
+                  const SizedBox(height: 20),
+
+                  // Exercise name
+                  Text(
+                    exercise.name,
+                    style: GoogleFonts.outfit(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w800,
+                      color: AppTheme.charcoal,
                     ),
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 8),
+
+                  // Muscle group chip
+                  if (exercise.muscleGroup != null)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primaryBlue.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(AppTheme.radiusFull),
+                      ),
+                      child: Text(
+                        exercise.muscleGroup!,
+                        style: const TextStyle(
+                            fontSize: 12,
+                            color: AppTheme.primaryBlue,
+                            fontWeight: FontWeight.w600),
+                      ),
+                    ),
+
+                  const SizedBox(height: 16),
+
+                  // GIF
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: Image.asset(
+                      'assets/flapppy-gym.gif',
+                      fit: BoxFit.cover,
+                      height: 120,
+                      width: double.infinity,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Sets × Reps info
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      _StatBlock(label: 'Sets', value: '${exercise.sets}'),
+                      const _Divider(),
+                      _StatBlock(label: 'Reps', value: '${exercise.reps}'),
+                      const _Divider(),
+                      _StatBlock(
+                          label: 'Done',
+                          value: '$completedSets',
+                          valueColor: AppTheme.primaryBlue),
+                    ],
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // Rep dots
+                  Wrap(
+                    alignment: WrapAlignment.center,
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: List.generate(exercise.reps, (i) {
+                      final done = i < currentReps || completedSets >= exercise.sets;
+                      return AnimatedContainer(
+                        duration: const Duration(milliseconds: 300),
+                        width: done ? 16 : 12,
+                        height: done ? 16 : 12,
+                        decoration: BoxDecoration(
+                          color: done ? AppTheme.primaryBlue : AppTheme.lightGrey,
+                          shape: BoxShape.circle,
+                          boxShadow: done
+                              ? [
+                                  BoxShadow(
+                                    color: AppTheme.primaryBlue.withValues(alpha: 0.6),
+                                    blurRadius: 8,
+                                    spreadRadius: 2,
+                                  )
+                                ]
+                              : null,
+                        ),
+                      );
+                    }),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // Set dots
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(exercise.sets, (i) {
+                      final done = i < completedSets;
+                      return AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        margin: const EdgeInsets.symmetric(horizontal: 4),
+                        width: done ? 32 : 24,
+                        height: 12,
+                        decoration: BoxDecoration(
+                          color: done ? AppTheme.primaryBlue : AppTheme.lightGrey,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                      );
+                    }),
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // Sets List (with weights)
+                  Column(
+                    children: List.generate(exercise.sets, (i) {
+                      final isCurrent = i == completedSets;
+                      final isDone = i < completedSets;
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 24,
+                              height: 24,
+                              decoration: BoxDecoration(
+                                color: isDone ? AppTheme.primaryBlue : (isCurrent ? Colors.amber : AppTheme.lightGrey),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Center(
+                                child: Icon(isDone ? Icons.check : Icons.fitness_center, size: 12, color: AppTheme.white),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Text('Set ${i + 1}', style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: isCurrent ? AppTheme.charcoal : AppTheme.mediumGrey)),
+                            const Spacer(),
+                            _WeightControl(
+                              value: exercise.weights[i],
+                              onDecrement: () {
+                                if (exercise.weights[i] > 0 && onWeightChanged != null) {
+                                  onWeightChanged!(i, exercise.weights[i] - 1.0);
+                                }
+                              },
+                              onIncrement: () {
+                                if (onWeightChanged != null) {
+                                  onWeightChanged!(i, exercise.weights[i] + 1.0);
+                                }
+                              },
+                            ),
+                            const SizedBox(width: 8),
+                            const Text('KG', style: TextStyle(fontSize: 10, color: AppTheme.mediumGrey, fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                      );
+                    }),
+                  ),
                 ],
               ),
-              child: exercise.thumbnailUrl == null
-                  ? const Icon(Icons.fitness_center_rounded, color: AppTheme.white, size: 40)
-                  : null,
             ),
-          ),
-          const SizedBox(height: 20),
-
-          // Exercise name
-          Text(
-            exercise.name,
-            style: GoogleFonts.outfit(
-              fontSize: 22,
-              fontWeight: FontWeight.w800,
-              color: AppTheme.charcoal,
-            ),
-            textAlign: TextAlign.center,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 8),
-
-          // Muscle group chip
-          if (exercise.muscleGroup != null)
-            Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-              decoration: BoxDecoration(
-                color: AppTheme.primaryBlue.withValues(alpha: 0.1),
-                borderRadius:
-                    BorderRadius.circular(AppTheme.radiusFull),
-              ),
-              child: Text(
-                exercise.muscleGroup!,
-                style: const TextStyle(
-                    fontSize: 12,
-                    color: AppTheme.primaryBlue,
-                    fontWeight: FontWeight.w600),
-              ),
-            ),
-
-          const SizedBox(height: 16),
-          Expanded(
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(16),
-              child: Image.asset(
-                'assets/flapppy-gym.gif',
-                fit: BoxFit.cover,
-                width: double.infinity,
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          // Sets × Reps info
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              _StatBlock(label: 'Sets', value: '${exercise.sets}'),
-              const _Divider(),
-              _StatBlock(label: 'Reps', value: '${exercise.reps}'),
-              const _Divider(),
-              _StatBlock(
-                  label: 'Done',
-                  value: '$completedSets',
-                  valueColor: AppTheme.primaryBlue),
-            ],
-          ),
-
-          const SizedBox(height: 16),
-
-          // Rep dots
-          Wrap(
-            alignment: WrapAlignment.center,
-            spacing: 6,
-            runSpacing: 6,
-            children: List.generate(exercise.reps, (i) {
-              final done = i < currentReps || completedSets >= exercise.sets;
-              return AnimatedContainer(
-                duration: const Duration(milliseconds: 300),
-                width: done ? 16 : 12,
-                height: done ? 16 : 12,
-                decoration: BoxDecoration(
-                  color: done ? AppTheme.primaryBlue : AppTheme.lightGrey,
-                  shape: BoxShape.circle,
-                  boxShadow: done
-                      ? [
-                          BoxShadow(
-                            color: AppTheme.primaryBlue.withValues(alpha: 0.6),
-                            blurRadius: 8,
-                            spreadRadius: 2,
-                          )
-                        ]
-                      : null,
-                ),
-              );
-            }),
-          ),
-
-          const SizedBox(height: 16),
-
-          // Set dots
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: List.generate(exercise.sets, (i) {
-              final done = i < completedSets;
-              return AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                margin: const EdgeInsets.symmetric(horizontal: 4),
-                width: done ? 32 : 24,
-                height: 12,
-                decoration: BoxDecoration(
-                  color: done
-                      ? AppTheme.primaryBlue
-                      : AppTheme.lightGrey,
-                  borderRadius: BorderRadius.circular(6),
-                ),
-              );
-            }),
           ),
 
           const SizedBox(height: 24),
@@ -689,6 +764,59 @@ class _Divider extends StatelessWidget {
       width: 1,
       height: 36,
       color: AppTheme.lightGrey,
+    );
+  }
+}
+
+class _WeightControl extends StatelessWidget {
+  final double value;
+  final VoidCallback onDecrement;
+  final VoidCallback onIncrement;
+
+  const _WeightControl({
+    required this.value,
+    required this.onDecrement,
+    required this.onIncrement,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _Btn(icon: Icons.remove, onTap: onDecrement),
+        SizedBox(
+          width: 36,
+          child: Text(
+            value.toStringAsFixed(value.truncateToDouble() == value ? 0 : 1),
+            textAlign: TextAlign.center,
+            style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 13),
+          ),
+        ),
+        _Btn(icon: Icons.add, onTap: onIncrement),
+      ],
+    );
+  }
+}
+
+class _Btn extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+  const _Btn({required this.icon, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 20,
+        height: 20,
+        decoration: BoxDecoration(
+          color: AppTheme.primaryBlue.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: Icon(icon, size: 12, color: AppTheme.primaryBlue),
+      ),
     );
   }
 }

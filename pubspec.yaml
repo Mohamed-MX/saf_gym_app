@@ -51,6 +51,9 @@ dependencies:
   tflite_flutter: ^0.11.0 # Or latest version
   share_plus: ^13.1.0
   path_provider: ^2.1.5
+  pdf: ^3.12.0
+  printing: ^5.14.3
+  fl_chart: ^1.2.0
 
 dependency_overrides:
   # path_provider_foundation 2.6.0+ pulls in objective_c 9.x which runs a
