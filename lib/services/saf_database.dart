@@ -24,7 +24,7 @@ class SafDatabase {
 
     return openDatabase(
       path,
-      version: 3,
+      version: 4,
       onCreate: (db, _) async {
         // 1. Exercises Table (Cache)
         await db.execute('''
@@ -59,7 +59,8 @@ class SafDatabase {
             time_taken_seconds INTEGER NOT NULL,
             workout_name TEXT NOT NULL,
             exercise_name TEXT NOT NULL,
-            reps INTEGER NOT NULL
+            reps INTEGER NOT NULL,
+            weight REAL NOT NULL DEFAULT 0.0
           )
         ''');
       },
@@ -79,6 +80,9 @@ class SafDatabase {
         } else if (oldVersion < 3) {
           await db.execute('ALTER TABLE performance_logs ADD COLUMN session_id INTEGER NOT NULL DEFAULT 0');
           await db.execute('ALTER TABLE performance_logs ADD COLUMN time_taken_seconds INTEGER NOT NULL DEFAULT 0');
+        }
+        if (oldVersion < 4) {
+          await db.execute('ALTER TABLE performance_logs ADD COLUMN weight REAL NOT NULL DEFAULT 0.0');
         }
       },
     );

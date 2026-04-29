@@ -9,6 +9,7 @@ class PlannedExercise {
   final String? muscleGroup;
   int sets;
   int reps;
+  List<double> weights;
 
   PlannedExercise({
     required this.exerciseId,
@@ -17,17 +18,35 @@ class PlannedExercise {
     this.muscleGroup,
     this.sets = 3,
     this.reps = 12,
-  });
+    List<double>? weights,
+  }) : weights = weights ?? List.filled(sets, 12.5);
 
-  factory PlannedExercise.fromJson(Map<String, dynamic> json) =>
-      PlannedExercise(
-        exerciseId: json['exerciseId'] as int,
-        name: json['name'] as String,
-        thumbnailUrl: json['thumbnailUrl'] as String?,
-        muscleGroup: json['muscleGroup'] as String?,
-        sets: json['sets'] as int? ?? 3,
-        reps: json['reps'] as int? ?? 12,
-      );
+  factory PlannedExercise.fromJson(Map<String, dynamic> json) {
+    final parsedSets = json['sets'] as int? ?? 3;
+    List<double> parsedWeights;
+    if (json['weights'] != null) {
+      parsedWeights = (json['weights'] as List<dynamic>).map((e) => (e as num).toDouble()).toList();
+      if (parsedWeights.length != parsedSets) {
+        final oldWeights = parsedWeights;
+        parsedWeights = List.filled(parsedSets, 12.5);
+        for (int i = 0; i < oldWeights.length && i < parsedSets; i++) {
+          parsedWeights[i] = oldWeights[i];
+        }
+      }
+    } else {
+      parsedWeights = List.filled(parsedSets, 12.5);
+    }
+    
+    return PlannedExercise(
+      exerciseId: json['exerciseId'] as int,
+      name: json['name'] as String,
+      thumbnailUrl: json['thumbnailUrl'] as String?,
+      muscleGroup: json['muscleGroup'] as String?,
+      sets: parsedSets,
+      reps: json['reps'] as int? ?? 12,
+      weights: parsedWeights,
+    );
+  }
 
   Map<String, dynamic> toJson() => {
         'exerciseId': exerciseId,
@@ -36,7 +55,18 @@ class PlannedExercise {
         if (muscleGroup != null) 'muscleGroup': muscleGroup,
         'sets': sets,
         'reps': reps,
+        'weights': weights,
       };
+
+  void updateSets(int newSets) {
+    if (newSets == sets) return;
+    if (newSets > sets) {
+      weights.addAll(List.filled(newSets - sets, 12.5));
+    } else {
+      weights = weights.sublist(0, newSets);
+    }
+    sets = newSets;
+  }
 }
 
 // ── WorkoutDay ─────────────────────────────────────────────────────────────
