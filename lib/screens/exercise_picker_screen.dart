@@ -330,7 +330,9 @@ class _ExercisePickerViewState extends State<_ExercisePickerView> with TickerPro
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      body: CustomScrollView(
+      body: SafeArea(
+        bottom: true,
+        child: CustomScrollView(
         slivers: [
           // Body Map and Toggles
           SliverToBoxAdapter(
@@ -482,6 +484,7 @@ class _ExercisePickerViewState extends State<_ExercisePickerView> with TickerPro
               ),
             ),
         ],
+      ),
       ),
       bottomNavigationBar: vm.selectedCount > 0
           ? SafeArea(
