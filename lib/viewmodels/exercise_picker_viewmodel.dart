@@ -127,6 +127,7 @@ class ExercisePickerViewModel extends ChangeNotifier {
     if (_selectedMuscles.contains(muscleId)) {
       _selectedMuscles.remove(muscleId);
     } else {
+      _selectedMuscles.clear();
       _selectedMuscles.add(muscleId);
     }
     search();

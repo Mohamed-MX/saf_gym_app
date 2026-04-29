@@ -4,7 +4,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'theme/app_theme.dart';
 import 'screens/splash_screen.dart';
 import 'screens/home_screen.dart';
-import 'screens/categories_screen.dart';
+import 'screens/performance_dashboard_screen.dart';
 import 'screens/muscle_selection_screen.dart';
 import 'screens/workout_plans_screen.dart';
 import 'ble/ble_manager.dart';
@@ -53,7 +53,7 @@ class _MainShellState extends State<MainShell> {
 
   final List<Widget> _screens = const [
     HomeScreen(),
-    CategoriesScreen(),
+    PerformanceDashboardScreen(),
     WorkoutPlansScreen(),
   ];
 
@@ -88,8 +88,8 @@ class _MainShellState extends State<MainShell> {
                 ),
                 _buildNavItem(
                   index: 1,
-                  icon: Icons.category_rounded,
-                  label: 'Categories',
+                  icon: Icons.bar_chart_rounded,
+                  label: 'Dashboard',
                 ),
                 _buildNavItem(
                   index: 2,
