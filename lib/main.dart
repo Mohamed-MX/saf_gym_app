@@ -1,15 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'firebase_options.dart';
+import 'services/auth_service.dart';
 import 'theme/app_theme.dart';
 import 'screens/splash_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/performance_dashboard_screen.dart';
 import 'screens/workout_plans_screen.dart';
-import 'ble/ble_manager.dart';
+import 'screens/intro_screen.dart';
+import 'screens/login_screen.dart';
+import 'screens/signup_screen.dart';
+import 'screens/forgot_password_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
   await dotenv.load(fileName: '.env');
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
@@ -29,14 +39,41 @@ class SAFApp extends StatelessWidget {
       title: 'SAF',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
-      initialRoute: '/',
+      home: const SplashScreen(),
       routes: {
-        '/': (context) => const SplashScreen(),
+        '/auth-check': (context) => const AuthWrapper(),
+        '/intro': (context) => const IntroScreen(),
+        '/login': (context) => const LoginScreen(),
+        '/signup': (context) => const SignupScreen(),
+        '/forgot-password': (context) => const ForgotPasswordScreen(),
         '/main': (context) => const MainShell(),
       },
     );
   }
 }
+
+class AuthWrapper extends StatelessWidget {
+  const AuthWrapper({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<User?>(
+      stream: AuthService().authStateChanges,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+        if (snapshot.hasData) {
+          return const MainShell();
+        }
+        return const IntroScreen();
+      },
+    );
+  }
+}
+
 
 /// Main shell with bottom navigation bar
 class MainShell extends StatefulWidget {

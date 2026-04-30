@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 
 BluetoothDevice? _connectedDevice;
@@ -37,6 +38,8 @@ class BleManager {
   // ===============================
   // STEP 1: SCAN + CONNECT
   // ===============================
+  StreamSubscription? _scanSubscription;
+
   Future<void> startScan() async {
     if (_connectedDevice != null) {
       print("✅ Already connected, skipping scan");
@@ -48,29 +51,25 @@ class BleManager {
 
     print("🔍 Scanning...");
 
-    FlutterBluePlus.startScan(timeout: Duration(seconds: 4));
+    await FlutterBluePlus.startScan(timeout: const Duration(seconds: 4));
 
-    FlutterBluePlus.scanResults.listen((results) async {
+    _scanSubscription?.cancel();
+    _scanSubscription = FlutterBluePlus.scanResults.listen((results) async {
       for (var r in results) {
-
         if (r.device.platformName.contains("SmartGymSensor")) {
-
-          print("✅ Found device");
-
+          print("✅ Found device: ${r.device.platformName}");
+          _scanSubscription?.cancel();
           await FlutterBluePlus.stopScan();
 
           _connectedDevice = r.device;
-
           try {
-            await _connectedDevice!.connect(timeout: Duration(seconds: 5));
-            print("✅ Connected");
-
+            await _connectedDevice!.connect(timeout: const Duration(seconds: 5));
+            print("✅ Connected to ${r.device.platformName}");
             await discoverServices();
-
           } catch (e) {
             print("❌ Connection failed: $e");
+            _connectedDevice = null;
           }
-
           break;
         }
       }

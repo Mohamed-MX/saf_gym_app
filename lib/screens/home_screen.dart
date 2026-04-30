@@ -1,3 +1,5 @@
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -16,6 +18,8 @@ import 'workout_plan_editor_screen.dart';
 import 'workout_plans_screen.dart';
 import 'performance_dashboard_screen.dart';
 import 'workout_session_screen.dart';
+import 'profile_screen.dart';
+import '../services/auth_service.dart';
 
 // ── Changed to StatefulWidget to safely handle the scan on startup ──
 class HomeScreen extends StatefulWidget {
@@ -202,6 +206,7 @@ class _HomeHeader extends StatefulWidget {
 }
 
 class _HomeHeaderState extends State<_HomeHeader> {
+  String? _profileImagePath;
   // Shared BLE manager instance shown in header dot + passed to sheet
   final BleManager _bleManager = BleManager();
   bool _bleConnected = false;
@@ -209,11 +214,19 @@ class _HomeHeaderState extends State<_HomeHeader> {
   @override
   void initState() {
     super.initState();
+    _loadProfileImage();
     _bleManager.onDataCallback = (_, __, ___) {
       if (mounted && !_bleConnected) {
         setState(() => _bleConnected = true);
       }
     };
+  }
+
+  Future<void> _loadProfileImage() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _profileImagePath = prefs.getString('profileImagePath');
+    });
   }
 
   void _openBleSheet() {
@@ -339,11 +352,10 @@ class _HomeHeaderState extends State<_HomeHeader> {
                   // ── Profile avatar ───────────────────────────────────────
                   GestureDetector(
                     onTap: () {
-                      showModalBottomSheet(
-                        context: context,
-                        backgroundColor: Colors.transparent,
-                        builder: (_) => const _ProfileSheet(),
-                      );
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const ProfileScreen()),
+                      ).then((_) => _loadProfileImage());
                     },
                     child: Container(
                       width: 48,
@@ -355,12 +367,16 @@ class _HomeHeaderState extends State<_HomeHeader> {
                           color: AppTheme.white.withValues(alpha: 0.3),
                           width: 2,
                         ),
+                        image: _profileImagePath != null
+                            ? DecorationImage(
+                                image: FileImage(File(_profileImagePath!)),
+                                fit: BoxFit.cover,
+                              )
+                            : null,
                       ),
-                      child: const Icon(
-                        Icons.person_rounded,
-                        color: AppTheme.white,
-                        size: 26,
-                      ),
+                      child: _profileImagePath == null
+                          ? const Icon(Icons.person_rounded, color: AppTheme.white, size: 26)
+                          : null,
                     ),
                   ),
                 ],
@@ -1101,115 +1117,3 @@ class _TodaysPlanCard extends StatelessWidget {
   }
 }
 
-// ── Profile Bottom Sheet ───────────────────────────────────────────────────────
-
-class _ProfileSheet extends StatelessWidget {
-  const _ProfileSheet();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        color: AppTheme.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-      ),
-      padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Drag handle
-          Container(
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: AppTheme.mediumGrey.withValues(alpha: 0.4),
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          const SizedBox(height: 24),
-
-          // Avatar
-          Container(
-            width: 64,
-            height: 64,
-            decoration: const BoxDecoration(
-              color: AppTheme.charcoal,
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(Icons.person_rounded, color: AppTheme.white, size: 36),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'Your Profile',
-            style: GoogleFonts.outfit(
-              fontSize: 18,
-              fontWeight: FontWeight.w800,
-              color: AppTheme.charcoal,
-            ),
-          ),
-          const SizedBox(height: 24),
-
-          // Edit Profile button
-          _SheetButton(
-            icon: Icons.edit_rounded,
-            label: 'Edit Profile',
-            iconColor: AppTheme.primaryBlue,
-            onTap: () => Navigator.pop(context),
-          ),
-          const SizedBox(height: 12),
-
-          // Log Out button
-          _SheetButton(
-            icon: Icons.logout_rounded,
-            label: 'Log Out',
-            iconColor: Colors.redAccent,
-            onTap: () => Navigator.pop(context),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SheetButton extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color iconColor;
-  final VoidCallback onTap;
-
-  const _SheetButton({
-    required this.icon,
-    required this.label,
-    required this.iconColor,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: iconColor.withValues(alpha: 0.07),
-      borderRadius: BorderRadius.circular(14),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-          child: Row(
-            children: [
-              Icon(icon, color: iconColor, size: 22),
-              const SizedBox(width: 14),
-              Text(
-                label,
-                style: GoogleFonts.outfit(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                  color: AppTheme.charcoal,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}

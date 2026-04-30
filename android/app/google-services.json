@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "442557458233",
+    "project_id": "saf-gym-app",
+    "storage_bucket": "saf-gym-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:442557458233:android:b24460da636d10a4ebeae8",
+        "android_client_info": {
+          "package_name": "com.example.saf_gym_app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "442557458233-tfquf728pt9rahl8aosb7k85mk7c1tlq.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.saf_gym_app",
+            "certificate_hash": "6604d8417ebc9060ded7e626ca4bd3f3c19c08b9"
+          }
+        },
+        {
+          "client_id": "442557458233-92pflk3eqmq74ic2g5jkolm6ece4hqc0.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAIp7QrqUj_5ui-KO4p2SOPkSHpiz5BX9M"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "442557458233-92pflk3eqmq74ic2g5jkolm6ece4hqc0.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "442557458233-javjm4aj5b80or5sctva2b4b1ft7hj5m.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.safGymApp"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
