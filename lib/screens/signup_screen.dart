@@ -64,144 +64,179 @@ class _SignupScreenState extends State<SignupScreen> {
     }
   }
 
+  Future<void> _handleGoogleLogin() async {
+    setState(() => _isLoading = true);
+    try {
+      final userCred = await _authService.signInWithGoogle();
+      if (userCred != null && mounted) {
+        Navigator.of(context).pushNamedAndRemoveUntil('/auth-check', (route) => false);
+      }
+    } catch (e) {
+      _showError('Failed to sign in with Google. Please try again.');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Stack(
-        children: [
-          // Background Image
-          Container(
-            height: MediaQuery.of(context).size.height * 0.45,
-            decoration: BoxDecoration(
-              color: AppTheme.charcoal,
-              image: const DecorationImage(
-                // IMPORTANT: Place your photo at assets/gym_bg.jpg
-                image: AssetImage('assets/gym_bg.jpg'),
-                fit: BoxFit.cover,
-                colorFilter: ColorFilter.mode(Colors.black54, BlendMode.darken),
+      body: SafeArea(
+        child: Stack(
+          children: [
+            // Background Image
+            Container(
+              height: MediaQuery.of(context).size.height * 0.45,
+              decoration: BoxDecoration(
+                color: AppTheme.charcoal,
+                image: const DecorationImage(
+                  // IMPORTANT: Place your photo at assets/gym_bg.jpg
+                  image: AssetImage('assets/gym_bg.jpg'),
+                  fit: BoxFit.cover,
+                  colorFilter: ColorFilter.mode(Colors.black54, BlendMode.darken),
+                ),
               ),
-            ),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: AppTheme.spacingXl),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.arrow_back_ios, color: AppTheme.white),
-                      padding: EdgeInsets.zero,
-                      alignment: Alignment.centerLeft,
-                      onPressed: () => Navigator.pop(context),
-                    ),
-                    const SizedBox(height: AppTheme.spacingMd),
-                    Text(
-                      'Hello,\nWelcome to your second\nhome <3',
-                      style: AppTheme.lightTheme.textTheme.displayMedium?.copyWith(
-                        color: AppTheme.white,
-                        fontWeight: FontWeight.w400,
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: AppTheme.spacingXl),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.arrow_back_ios, color: AppTheme.white),
+                        padding: EdgeInsets.zero,
+                        alignment: Alignment.centerLeft,
+                        onPressed: () => Navigator.pop(context),
                       ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          
-          // Bottom Form Card
-          Align(
-            alignment: Alignment.bottomCenter,
-            child: Container(
-              height: MediaQuery.of(context).size.height * 0.60,
-              padding: const EdgeInsets.all(AppTheme.spacingXl),
-              decoration: const BoxDecoration(
-                color: AppTheme.lightGrey,
-                borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(AppTheme.radiusXl),
-                  topRight: Radius.circular(AppTheme.radiusXl),
-                ),
-              ),
-              child: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(
-                      'Your Account',
-                      style: AppTheme.lightTheme.textTheme.headlineLarge,
-                    ),
-                    const SizedBox(height: AppTheme.spacingLg),
-                    
-                    // Email Field
-                    _buildTextField(
-                      controller: _emailController,
-                      hintText: 'Email',
-                    ),
-                    const SizedBox(height: AppTheme.spacingMd),
-                    
-                    // Password Field
-                    _buildTextField(
-                      controller: _passwordController,
-                      hintText: 'Password',
-                      obscureText: _obscurePassword,
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _obscurePassword ? Icons.visibility_off : Icons.visibility,
-                          color: AppTheme.darkGrey,
+                      const SizedBox(height: AppTheme.spacingMd),
+                      Text(
+                        'Hello,\nWelcome to your second\nhome <3',
+                        style: AppTheme.lightTheme.textTheme.displayMedium?.copyWith(
+                          color: AppTheme.white,
+                          fontWeight: FontWeight.w400,
                         ),
-                        onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                       ),
-                    ),
-                    const SizedBox(height: AppTheme.spacingMd),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            
+            // Bottom Form Card
+            Align(
+              alignment: Alignment.bottomCenter,
+              child: Container(
+                height: MediaQuery.of(context).size.height * 0.60,
+                padding: const EdgeInsets.all(AppTheme.spacingXl),
+                decoration: const BoxDecoration(
+                  color: AppTheme.lightGrey,
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(AppTheme.radiusXl),
+                    topRight: Radius.circular(AppTheme.radiusXl),
+                  ),
+                ),
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        'Your Account',
+                        style: AppTheme.lightTheme.textTheme.headlineLarge,
+                      ),
+                      const SizedBox(height: AppTheme.spacingLg),
+                      
+                      // Email Field
+                      _buildTextField(
+                        controller: _emailController,
+                        hintText: 'Email',
+                      ),
+                      const SizedBox(height: AppTheme.spacingMd),
+                      
+                      // Password Field
+                      _buildTextField(
+                        controller: _passwordController,
+                        hintText: 'Password',
+                        obscureText: _obscurePassword,
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                            color: AppTheme.darkGrey,
+                          ),
+                          onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                        ),
+                      ),
+                      const SizedBox(height: AppTheme.spacingMd),
 
-                    // Confirm Password Field
-                    _buildTextField(
-                      controller: _confirmPasswordController,
-                      hintText: 'Confirm password',
-                      obscureText: _obscureConfirmPassword,
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _obscureConfirmPassword ? Icons.visibility_off : Icons.visibility,
-                          color: AppTheme.darkGrey,
+                      // Confirm Password Field
+                      _buildTextField(
+                        controller: _confirmPasswordController,
+                        hintText: 'Confirm password',
+                        obscureText: _obscureConfirmPassword,
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            _obscureConfirmPassword ? Icons.visibility_off : Icons.visibility,
+                            color: AppTheme.darkGrey,
+                          ),
+                          onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
                         ),
-                        onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
                       ),
-                    ),
-                    const SizedBox(height: AppTheme.spacingMd),
+                      const SizedBox(height: AppTheme.spacingMd),
 
-                    // Username Field
-                    _buildTextField(
-                      controller: _usernameController,
-                      hintText: 'Username',
-                    ),
-                    
-                    const SizedBox(height: AppTheme.spacingXl),
-                    
-                    // Sign Up Button
-                    ElevatedButton(
-                      onPressed: _isLoading ? null : _handleSignup,
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        backgroundColor: AppTheme.mediumGrey, // Matching mockup color
-                        foregroundColor: AppTheme.charcoal,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+                      // Username Field
+                      _buildTextField(
+                        controller: _usernameController,
+                        hintText: 'Username',
+                      ),
+                      
+                      const SizedBox(height: AppTheme.spacingXl),
+                      
+                      // Sign Up Button
+                      ElevatedButton(
+                        onPressed: _isLoading ? null : _handleSignup,
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          backgroundColor: AppTheme.mediumGrey, // Matching mockup color
+                          foregroundColor: AppTheme.charcoal,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+                          ),
+                        ),
+                        child: _isLoading
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(color: AppTheme.charcoal, strokeWidth: 2),
+                              )
+                            : const Text('Sign up'),
+                      ),
+                      const SizedBox(height: AppTheme.spacingMd),
+                      OutlinedButton.icon(
+                        onPressed: _isLoading ? null : _handleGoogleLogin,
+                        icon: Image.network(
+                          'https://www.gstatic.com/images/branding/product/2x/googleg_48dp.png',
+                          width: 20,
+                          height: 20,
+                          errorBuilder: (context, error, stackTrace) => const Icon(Icons.g_mobiledata, size: 28),
+                        ),
+                        label: const Text('Continue with Google'),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          foregroundColor: AppTheme.charcoal,
+                          side: const BorderSide(color: AppTheme.mediumGrey),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+                          ),
                         ),
                       ),
-                      child: _isLoading
-                          ? const SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(color: AppTheme.charcoal, strokeWidth: 2),
-                            )
-                          : const Text('Sign up'),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
