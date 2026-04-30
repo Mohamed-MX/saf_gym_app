@@ -82,4 +82,6 @@ SAF is a premium, feature-rich gym companion application built with Flutter, des
 
 ---
 
-*Developed as a graduation project by [Mohamed-MX](https://github.com/Mohamed-MX).*
+*Developed as a graduation project by 
+[Mohamed M. Basyony](https://github.com/Mohamed-MX).*
+[San Saad](https://github.com/sonson818).*
