@@ -72,7 +72,7 @@ SAF is a premium, feature-rich gym companion application built with Flutter, des
    ```
 
 3. **Set up environment**
-   - Create a `.env` file in the root directory.
+   - Create a `firebase_options.dart ` file in the root directory.
    - Add your necessary API keys (e.g., for AI features).
 
 4. **Run the app**
