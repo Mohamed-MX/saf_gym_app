@@ -2,6 +2,23 @@
 
 SAF is a premium, feature-rich gym companion application built with Flutter, designed to help users track their strength training progress with precision and intelligence.
 
+<table>
+  <tr>
+ <img width="1376" height="768" alt="Gemini_Generated_Image_6ifnt06ifnt06ifn" src="https://github.com/user-attachments/assets/630be31b-0994-4d1f-afeb-b5eab461cb30" />
+  </tr>
+  <tr>
+<td><img width="250" height="500" alt="Screenshot_20260430_170607" src="https://github.com/user-attachments/assets/1bc51b1e-f017-4813-9552-2b701fcd672c" />
+<td><img width="250" height="500" alt="Screenshot_20260430_170200" src="https://github.com/user-attachments/assets/bb7038c5-5a22-48f9-886a-374e24fccb4d" />
+<td><img width="250" height="500" alt="Screenshot_20260430_170128" src="https://github.com/user-attachments/assets/08826a09-22d1-4cad-b04a-985fe398ceba" />
+
+</tr>
+  <tr>
+<td><img width="250" height="500" alt="Screenshot_20260430_170124" src="https://github.com/user-attachments/assets/ebb06de3-bdcd-4964-be80-796d797112b1" />
+<td><img width="250" height="500" alt="Screenshot_20260430_165900" src="https://github.com/user-attachments/assets/a33bea3d-670d-4d40-9466-5650249a810f" />
+<td><img width="250" height="500" alt="Screenshot_20260430_165846" src="https://github.com/user-attachments/assets/57414eef-fb8a-4145-a918-ed1ab40b1f0e" />
+  </tr>
+</table>
+
 ## 🚀 Key Features
 
 - **📊 Advanced Performance Dashboard**
