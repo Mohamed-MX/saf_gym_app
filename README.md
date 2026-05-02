@@ -4,7 +4,8 @@ SAF is a premium, feature-rich gym companion application built with Flutter, des
 
 <table>
   <tr>
- <img width="1376" height="768" alt="Gemini_Generated_Image_6ifnt06ifnt06ifn" src="https://github.com/user-attachments/assets/630be31b-0994-4d1f-afeb-b5eab461cb30" />
+<img width="1376" height="768" alt="UI jmock" src="https://github.com/user-attachments/assets/b18268c5-4ab8-4914-94b1-8ebe10ce3ecf" />
+
   </tr>
   <tr>
 <td><img width="250" height="500" alt="Screenshot_20260430_170607" src="https://github.com/user-attachments/assets/1bc51b1e-f017-4813-9552-2b701fcd672c" />
