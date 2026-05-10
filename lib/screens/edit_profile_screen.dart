@@ -18,6 +18,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final _targetWeightController = TextEditingController();
   final _startedWeightController = TextEditingController();
   final _usernameController = TextEditingController();
+  final _ageController = TextEditingController();
+  final _heightController = TextEditingController();
+  
+  String _gender = 'Male';
+  int _activityFactor = 3;
   
   String? _profileImagePath;
   bool _isLoading = false;
@@ -35,7 +40,21 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       _targetWeightController.text = (prefs.getDouble('targetWeight') ?? 60.0).toString();
       _startedWeightController.text = (prefs.getDouble('startedWeight') ?? 75.0).toString();
       _usernameController.text = _authService.currentUser?.displayName ?? '';
+      _ageController.text = (prefs.getInt('age') ?? 25).toString();
+      _heightController.text = (prefs.getDouble('height') ?? 175.0).toString();
+      _gender = prefs.getString('gender') ?? 'Male';
+      _activityFactor = prefs.getInt('activityFactor') ?? 3;
     });
+  }
+
+  @override
+  void dispose() {
+    _targetWeightController.dispose();
+    _startedWeightController.dispose();
+    _usernameController.dispose();
+    _ageController.dispose();
+    _heightController.dispose();
+    super.dispose();
   }
 
   Future<void> _pickImage() async {
@@ -89,6 +108,26 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Username updated!'), backgroundColor: Colors.green),
+        );
+      }
+    }
+  }
+
+  Future<void> _saveHealthData() async {
+    final ageStr = _ageController.text.trim();
+    final heightStr = _heightController.text.trim();
+    
+    if (ageStr.isNotEmpty && int.tryParse(ageStr) != null &&
+        heightStr.isNotEmpty && double.tryParse(heightStr) != null) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt('age', int.parse(ageStr));
+      await prefs.setDouble('height', double.parse(heightStr));
+      await prefs.setString('gender', _gender);
+      await prefs.setInt('activityFactor', _activityFactor);
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Health metrics updated!'), backgroundColor: Colors.green),
         );
       }
     }
@@ -267,6 +306,85 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   child: const Text('Save', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                 ),
               ],
+            ),
+            const SizedBox(height: 32),
+
+            // Health Metrics
+            Text(
+              'Health Metrics',
+              style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: AppTheme.charcoal),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: DropdownButtonFormField<String>(
+                    value: _gender,
+                    decoration: InputDecoration(
+                      labelText: 'Gender',
+                      filled: true,
+                      fillColor: Colors.white,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                    ),
+                    items: ['Male', 'Female'].map((g) => DropdownMenuItem(value: g, child: Text(g))).toList(),
+                    onChanged: (val) => setState(() => _gender = val!),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextField(
+                    controller: _ageController,
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(
+                      labelText: 'Age',
+                      filled: true,
+                      fillColor: Colors.white,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _heightController,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: InputDecoration(
+                      labelText: 'Height (cm)',
+                      filled: true,
+                      fillColor: Colors.white,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: DropdownButtonFormField<int>(
+                    value: _activityFactor,
+                    decoration: InputDecoration(
+                      labelText: 'Activity (1-5)',
+                      filled: true,
+                      fillColor: Colors.white,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                    ),
+                    items: [1, 2, 3, 4, 5].map((a) => DropdownMenuItem(value: a, child: Text(a.toString()))).toList(),
+                    onChanged: (val) => setState(() => _activityFactor = val!),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            ElevatedButton(
+              onPressed: _saveHealthData,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primaryBlue,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              child: const Text('Save Health Metrics', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
             ),
             const SizedBox(height: 32),
 

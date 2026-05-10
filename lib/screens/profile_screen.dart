@@ -22,6 +22,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
   double _currentWeight = 69.0;
   double _targetWeight = 60.0;
   double _startedWeight = 75.0;
+  String _gender = 'Male';
+  int _age = 25;
+  double _height = 175.0;
+  int _activityFactor = 3;
   
   // Mock data for workouts
   int _startedWorkouts = 65;
@@ -59,6 +63,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _currentWeight = prefs.getDouble('currentWeight') ?? 69.0;
       _targetWeight = prefs.getDouble('targetWeight') ?? 60.0;
       _startedWeight = prefs.getDouble('startedWeight') ?? 75.0;
+      _gender = prefs.getString('gender') ?? 'Male';
+      _age = prefs.getInt('age') ?? 25;
+      _height = prefs.getDouble('height') ?? 175.0;
+      _activityFactor = prefs.getInt('activityFactor') ?? 3;
       _injuries = prefs.getStringList('injuries') ?? [];
       
       _completedWorkouts = completedDays.length;
@@ -110,34 +118,40 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _addInjury() async {
-    final TextEditingController controller = TextEditingController();
+    String? selectedInjury = 'Shoulder, Arm';
     final injury = await showDialog<String>(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF3B3B4F),
-        title: Text('Add Injury', style: GoogleFonts.outfit(color: Colors.white)),
-        content: TextField(
-          controller: controller,
-          style: const TextStyle(color: Colors.white),
-          decoration: const InputDecoration(
-            hintText: 'E.g., Left shoulder pain',
-            hintStyle: TextStyle(color: Colors.white38),
-            enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white38)),
-            focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: AppTheme.primaryBlue)),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setStateSB) => AlertDialog(
+            backgroundColor: const Color(0xFF3B3B4F),
+            title: Text('Add Injury', style: GoogleFonts.outfit(color: Colors.white)),
+            content: DropdownButton<String>(
+              value: selectedInjury,
+              dropdownColor: const Color(0xFF3B3B4F),
+              style: const TextStyle(color: Colors.white),
+              isExpanded: true,
+              items: ['Shoulder, Arm', 'Back, Chest', 'Legs']
+                  .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+                  .toList(),
+              onChanged: (val) {
+                setStateSB(() => selectedInjury = val);
+              },
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel', style: TextStyle(color: Colors.white70)),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+                onPressed: () => Navigator.pop(context, selectedInjury),
+                child: const Text('Add', style: TextStyle(color: Colors.white)),
+              ),
+            ],
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel', style: TextStyle(color: Colors.white70)),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
-            onPressed: () => Navigator.pop(context, controller.text),
-            child: const Text('Add', style: TextStyle(color: Colors.white)),
-          ),
-        ],
-      ),
+        );
+      },
     );
 
     if (injury != null && injury.trim().isNotEmpty) {
@@ -153,6 +167,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
         );
       }
     }
+  }
+
+  Future<void> _removeInjury(String injury) async {
+    final prefs = await SharedPreferences.getInstance();
+    final newInjuries = List<String>.from(_injuries)..remove(injury);
+    await prefs.setStringList('injuries', newInjuries);
+    setState(() {
+      _injuries = newInjuries;
+    });
   }
 
   Future<void> _logOut() async {
@@ -177,6 +200,33 @@ class _ProfileScreenState extends State<ProfileScreen> {
       workoutProgress = _completedWorkouts / _startedWorkouts;
       workoutProgress = workoutProgress.clamp(0.0, 1.0);
     }
+    
+    // Calculate BMI
+    double heightInM = _height / 100;
+    double bmi = 0;
+    if (heightInM > 0) {
+      bmi = _currentWeight / (heightInM * heightInM);
+    }
+    
+    // Calculate BMR
+    double bmr = (10 * _currentWeight) + (6.25 * _height) - (5 * _age);
+    if (_gender == 'Male') {
+      bmr += 5;
+    } else {
+      bmr -= 161;
+    }
+    
+    // Calculate TDEE
+    double multiplier = 1.2;
+    switch (_activityFactor) {
+      case 1: multiplier = 1.2; break;
+      case 2: multiplier = 1.375; break;
+      case 3: multiplier = 1.55; break;
+      case 4: multiplier = 1.725; break;
+      case 5: multiplier = 1.9; break;
+    }
+    double tdee = bmr * multiplier;
+    double targetCalories = tdee - 500;
 
     return Scaffold(
       backgroundColor: AppTheme.primaryBlue,
@@ -302,6 +352,50 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 textColor: Colors.white,
               ),
               const SizedBox(height: 24),
+              
+              // DAILY STATS Card
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF3B3B4F),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'DAILY HEALTH STATS',
+                      style: GoogleFonts.outfit(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                        letterSpacing: 1.2,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        _buildStatColumn('BMI', bmi.toStringAsFixed(1)),
+                        _buildStatColumn('TDEE', '${tdee.toStringAsFixed(0)} kcal'),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primaryBlue.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        'Recommendation: Consume ~${targetCalories.toStringAsFixed(0)} calories daily (500 deficit) to safely reach your target weight of ${_targetWeight.toStringAsFixed(0)}kg.',
+                        style: const TextStyle(color: Colors.white, fontSize: 13),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
 
               // WORKOUTS COMPLETED Card
               Container(
@@ -379,7 +473,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                        children: [
                          const Text('Current Injuries:', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                          const SizedBox(height: 8),
-                         ..._injuries.map((i) => Text('• $i', style: const TextStyle(color: Colors.white70))),
+                         ..._injuries.map((i) => Row(
+                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                           children: [
+                             Text('• $i', style: const TextStyle(color: Colors.white70)),
+                             IconButton(
+                               icon: const Icon(Icons.delete_outline, color: Colors.white54, size: 20),
+                               onPressed: () => _removeInjury(i),
+                               padding: EdgeInsets.zero,
+                               constraints: const BoxConstraints(),
+                             ),
+                           ],
+                         )),
                        ],
                      ),
                    ),

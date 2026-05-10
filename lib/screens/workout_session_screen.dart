@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../ble/ble_manager.dart';
 import '../logic/rep_game_logic.dart';
@@ -38,6 +39,8 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
 
   late final int _sessionId;
   late DateTime _lastSetEndTime;
+  List<String> _injuries = [];
+  final Set<int> _ignoredInjuries = {};
 
   @override
   void initState() {
@@ -46,7 +49,24 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
     _lastSetEndTime = DateTime.now();
     _completedSets =
         List.filled(widget.day.exercises.length, 0);
+    _loadInjuries();
     _initBle();
+  }
+
+  Future<void> _loadInjuries() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _injuries = prefs.getStringList('injuries') ?? [];
+    });
+  }
+
+  bool _isInjured(String? muscleGroup) {
+    if (muscleGroup == null) return false;
+    final group = muscleGroup.toLowerCase();
+    if (_injuries.contains('Shoulder, Arm') && (group.contains('shoulder') || group.contains('bicep') || group.contains('tricep') || group.contains('forearm') || group.contains('arm'))) return true;
+    if (_injuries.contains('Back, Chest') && (group.contains('chest') || group.contains('lat') || group.contains('back') || group.contains('trap'))) return true;
+    if (_injuries.contains('Legs') && (group.contains('leg') || group.contains('quad') || group.contains('hamstring') || group.contains('glute') || group.contains('calf') || group.contains('calves'))) return true;
+    return false;
   }
 
   void _initBle() {
@@ -207,6 +227,40 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
     );
   }
 
+  void _showInjuryDialog() {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: AppTheme.offWhite,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppTheme.radiusMd)),
+        title: Text('Exercise Skipped', style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: AppTheme.charcoal)),
+        content: Text(
+          'This exercise is greyed out because of your logged injury in ${_current.muscleGroup ?? "this muscle group"}.',
+          style: const TextStyle(color: AppTheme.mediumGrey),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _next();
+            },
+            child: const Text('Skip', style: TextStyle(color: AppTheme.darkGrey)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              setState(() {
+                _ignoredInjuries.add(_current.exerciseId);
+              });
+              Navigator.pop(context);
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryBlue),
+            child: const Text('Start Anyway', style: TextStyle(color: AppTheme.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final exercises = widget.day.exercises;
@@ -304,11 +358,13 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
                 currentReps: _logic.reps,
                 bleConnected: _bleConnected,
                 isTracking: _isTracking,
+                isInjured: _isInjured(_current.muscleGroup) && !_ignoredInjuries.contains(_current.exerciseId),
                 onStartTracking: _startTracking,
                 onCompleteSet: _completeSet,
                 onWeightChanged: _updateWeight,
                 onPrev: _prev,
                 onNext: _next,
+                onInjuryInfo: _showInjuryDialog,
                 isFirst: _currentIndex == 0,
                 isLast: _isLast,
               ),
@@ -365,11 +421,13 @@ class _ExerciseCard extends StatelessWidget {
   final int currentReps;
   final bool bleConnected;
   final bool isTracking;
+  final bool isInjured;
   final VoidCallback onStartTracking;
   final VoidCallback onCompleteSet;
   final void Function(int setIndex, double newWeight)? onWeightChanged;
   final VoidCallback onPrev;
   final VoidCallback onNext;
+  final VoidCallback onInjuryInfo;
   final bool isFirst;
   final bool isLast;
 
@@ -379,11 +437,13 @@ class _ExerciseCard extends StatelessWidget {
     required this.currentReps,
     required this.bleConnected,
     required this.isTracking,
+    required this.isInjured,
     required this.onStartTracking,
     required this.onCompleteSet,
     this.onWeightChanged,
     required this.onPrev,
     required this.onNext,
+    required this.onInjuryInfo,
     required this.isFirst,
     required this.isLast,
   });
@@ -634,34 +694,50 @@ class _ExerciseCard extends StatelessWidget {
           // Buttons Row
           Row(
             children: [
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: (!bleConnected || remaining <= 0 || isTracking) ? null : onStartTracking,
-                  icon: Icon(
-                    isTracking ? Icons.sensors_rounded : Icons.play_arrow_rounded,
-                    size: 20,
+              if (isInjured)
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: onInjuryInfo,
+                    icon: const Icon(Icons.info_outline_rounded, size: 20),
+                    label: Text('Skipped (Injury)', style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 15)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.redAccent.withValues(alpha: 0.1),
+                      foregroundColor: Colors.redAccent,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppTheme.radiusFull)),
+                    ),
                   ),
-                  label: Text(
-                    isTracking ? 'Tracking' : 'Start',
-                    style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 15),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.charcoal,
-                    foregroundColor: AppTheme.white,
-                    disabledBackgroundColor: isTracking ? AppTheme.charcoal.withValues(alpha: 0.5) : AppTheme.lightGrey,
-                    disabledForegroundColor: isTracking ? AppTheme.white : AppTheme.mediumGrey,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(AppTheme.radiusFull)),
+                )
+              else
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: (!bleConnected || remaining <= 0 || isTracking) ? null : onStartTracking,
+                    icon: Icon(
+                      isTracking ? Icons.sensors_rounded : Icons.play_arrow_rounded,
+                      size: 20,
+                    ),
+                    label: Text(
+                      isTracking ? 'Tracking' : 'Start',
+                      style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 15),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.charcoal,
+                      foregroundColor: AppTheme.white,
+                      disabledBackgroundColor: isTracking ? AppTheme.charcoal.withValues(alpha: 0.5) : AppTheme.lightGrey,
+                      disabledForegroundColor: isTracking ? AppTheme.white : AppTheme.mediumGrey,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(AppTheme.radiusFull)),
+                    ),
                   ),
                 ),
-              ),
               const SizedBox(width: 12),
               Expanded(
                 child: ElevatedButton(
-                  onPressed: remaining > 0 ? onCompleteSet : onNext,
+                  onPressed: isInjured ? onNext : (remaining > 0 ? onCompleteSet : onNext),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: remaining > 0 ? AppTheme.primaryBlue : Colors.green,
+                    backgroundColor: isInjured ? AppTheme.mediumGrey : (remaining > 0 ? AppTheme.primaryBlue : Colors.green),
                     foregroundColor: AppTheme.white,
                     disabledBackgroundColor: Colors.green.withValues(alpha: 0.15),
                     disabledForegroundColor: Colors.green,
@@ -673,13 +749,13 @@ class _ExerciseCard extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Icon(
-                        remaining > 0 ? Icons.check_rounded : (isLast ? Icons.emoji_events_rounded : Icons.arrow_forward_ios_rounded),
+                        isInjured ? Icons.skip_next_rounded : (remaining > 0 ? Icons.check_rounded : (isLast ? Icons.emoji_events_rounded : Icons.arrow_forward_ios_rounded)),
                         size: 20,
                       ),
                       const SizedBox(width: 8),
                       Flexible(
                         child: Text(
-                          remaining > 0 ? 'Complete ($remaining)' : (isLast ? 'Finish Workout' : 'Next Exercise'),
+                          isInjured ? 'Skip' : (remaining > 0 ? 'Complete ($remaining)' : (isLast ? 'Finish Workout' : 'Next Exercise')),
                           style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 14),
                           overflow: TextOverflow.ellipsis,
                         ),

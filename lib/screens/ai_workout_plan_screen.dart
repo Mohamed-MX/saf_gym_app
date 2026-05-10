@@ -8,14 +8,18 @@ import 'saf_ai_model_exp.dart';
 // ── Data Models ───────────────────────────────────────────────────────────────
 
 enum TrainingGoal {
-  strength('Strength', 'Low reps, High weight', Icons.fitness_center),
-  hypertrophy('Hypertrophy', 'Muscle growth focused', Icons.accessibility_new_rounded),
-  weightLoss('Weight Loss', 'Cardio & HIIT focused', Icons.local_fire_department_rounded);
+  strength('Strength', 'Low reps, High weight', Icons.fitness_center,
+      AiTrainingGoal.strength),
+  hypertrophy('Hypertrophy', 'Muscle growth focused',
+      Icons.accessibility_new_rounded, AiTrainingGoal.hypertrophy),
+  weightLoss('Weight Loss', 'Cardio & HIIT focused',
+      Icons.local_fire_department_rounded, AiTrainingGoal.weightLoss);
 
   final String label;
   final String subtitle;
   final IconData icon;
-  const TrainingGoal(this.label, this.subtitle, this.icon);
+  final AiTrainingGoal aiGoal;
+  const TrainingGoal(this.label, this.subtitle, this.icon, this.aiGoal);
 }
 
 enum ExperienceLevel {
@@ -52,7 +56,6 @@ class AiWorkoutPlanScreen extends StatefulWidget {
 
 class _AiWorkoutPlanScreenState extends State<AiWorkoutPlanScreen>
     with SingleTickerProviderStateMixin {
-  // Training Goal is kept in state but not used in generation yet
   TrainingGoal _selectedGoal = TrainingGoal.hypertrophy;
   ExperienceLevel _selectedLevel = ExperienceLevel.intermediate;
   final Set<String> _selectedEquipment = {};
@@ -123,11 +126,12 @@ class _AiWorkoutPlanScreenState extends State<AiWorkoutPlanScreen>
     try {
       plan = await SafAiModelExp.generateWorkout(
         level: _selectedLevel.aiLevel,
+        goal: _selectedGoal.aiGoal,
         equipment: Set.from(_selectedEquipment),
         selectedDays: Set.from(_selectedDays),
       );
     } catch (e) {
-      errorMsg = 'Failed to generate plan. Check your connection and try again.';
+      errorMsg = 'Error: $e';
     } finally {
       if (mounted) setState(() => _isGenerating = false);
     }
@@ -187,9 +191,8 @@ class _AiWorkoutPlanScreenState extends State<AiWorkoutPlanScreen>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // ── Training Goal (stored, not yet used in generation) ──
+                  // ── Training Goal ──────────────────────────────────────
                   _SectionTitle('Training Goal'),
-                  const SizedBox(height: 4),
                   const SizedBox(height: 12),
                   ...TrainingGoal.values.map(
                     (goal) => Padding(
@@ -1099,8 +1102,82 @@ class _ExercisePreviewRow extends StatelessWidget {
   final PlannedExercise exercise;
   const _ExercisePreviewRow({required this.exercise});
 
+  /// Cardio blocks are stored with a negative exerciseId.
+  bool get _isCardio => exercise.exerciseId < 0;
+
   @override
   Widget build(BuildContext context) {
+    return _isCardio ? _buildCardioRow() : _buildStrengthRow();
+  }
+
+  // ── Cardio row ─────────────────────────────────────────────────────────────
+  Widget _buildCardioRow() {
+    const orange = Color(0xFFFF7043);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: orange.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: orange.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: orange.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(Icons.directions_run_rounded,
+                color: orange, size: 22),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  exercise.name,
+                  style: GoogleFonts.outfit(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.charcoal,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                Text(
+                  exercise.muscleGroup ?? 'Cardio',
+                  style: TextStyle(fontSize: 11, color: orange.withValues(alpha: 0.85)),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: orange.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              '${exercise.reps} min',
+              style: GoogleFonts.outfit(
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+                color: orange,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Strength row ───────────────────────────────────────────────────────────
+  Widget _buildStrengthRow() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
@@ -1109,7 +1186,6 @@ class _ExercisePreviewRow extends StatelessWidget {
       ),
       child: Row(
         children: [
-          // Thumbnail or placeholder
           ClipRRect(
             borderRadius: BorderRadius.circular(8),
             child: exercise.thumbnailUrl != null

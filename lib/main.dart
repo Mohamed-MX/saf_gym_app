@@ -14,6 +14,8 @@ import 'screens/intro_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/signup_screen.dart';
 import 'screens/forgot_password_screen.dart';
+import 'screens/user_form_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -46,27 +48,52 @@ class SAFApp extends StatelessWidget {
         '/login': (context) => const LoginScreen(),
         '/signup': (context) => const SignupScreen(),
         '/forgot-password': (context) => const ForgotPasswordScreen(),
+        '/user-form': (context) => const UserFormScreen(),
         '/main': (context) => const MainShell(),
       },
     );
   }
 }
 
-class AuthWrapper extends StatelessWidget {
+class AuthWrapper extends StatefulWidget {
   const AuthWrapper({super.key});
+
+  @override
+  State<AuthWrapper> createState() => _AuthWrapperState();
+}
+
+class _AuthWrapperState extends State<AuthWrapper> {
+  bool? _hasCompletedForm;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkFormCompletion();
+  }
+
+  Future<void> _checkFormCompletion() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _hasCompletedForm = prefs.getBool('hasCompletedForm') ?? false;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<User?>(
       stream: AuthService().authStateChanges,
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
+        if (snapshot.connectionState == ConnectionState.waiting || _hasCompletedForm == null) {
           return const Scaffold(
             body: Center(child: CircularProgressIndicator()),
           );
         }
         if (snapshot.hasData) {
-          return const MainShell();
+          if (_hasCompletedForm == true) {
+            return const MainShell();
+          } else {
+            return const UserFormScreen();
+          }
         }
         return const IntroScreen();
       },
