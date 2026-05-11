@@ -2,7 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import '../services/firestore_service.dart';
 import '../services/auth_service.dart';
 import '../services/saf_database.dart';
 import '../theme/app_theme.dart';
@@ -41,7 +41,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _loadProfileData() async {
-    final prefs = await SharedPreferences.getInstance();
+    final profileData = await FirestoreService.instance.getProfile();
     final db = SafDatabase.instance;
     final logs = await db.getPerformanceLogs();
 
@@ -59,15 +59,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
 
     setState(() {
-      _profileImagePath = prefs.getString('profileImagePath');
-      _currentWeight = prefs.getDouble('currentWeight') ?? 69.0;
-      _targetWeight = prefs.getDouble('targetWeight') ?? 60.0;
-      _startedWeight = prefs.getDouble('startedWeight') ?? 75.0;
-      _gender = prefs.getString('gender') ?? 'Male';
-      _age = prefs.getInt('age') ?? 25;
-      _height = prefs.getDouble('height') ?? 175.0;
-      _activityFactor = prefs.getInt('activityFactor') ?? 3;
-      _injuries = prefs.getStringList('injuries') ?? [];
+      _profileImagePath = profileData['profileImagePath'] as String?;
+      _currentWeight = profileData['currentWeight'] as double? ?? 69.0;
+      _targetWeight = profileData['targetWeight'] as double? ?? 60.0;
+      _startedWeight = profileData['startedWeight'] as double? ?? 75.0;
+      _gender = profileData['gender'] as String? ?? 'Male';
+      _age = profileData['age'] as int? ?? 25;
+      _height = profileData['height'] as double? ?? 175.0;
+      _activityFactor = profileData['activityFactor'] as int? ?? 3;
+      _injuries = (profileData['injuries'] as List?)?.map((e) => e.toString()).toList() ?? [];
       
       _completedWorkouts = completedDays.length;
       _startedWorkouts = 7; // Weekly Goal
@@ -109,8 +109,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     if (newWeightStr != null && double.tryParse(newWeightStr) != null) {
       final newWeight = double.parse(newWeightStr);
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setDouble('currentWeight', newWeight);
+      await FirestoreService.instance.updateProfile({'currentWeight': newWeight});
       setState(() {
         _currentWeight = newWeight;
       });
@@ -155,9 +154,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
 
     if (injury != null && injury.trim().isNotEmpty) {
-      final prefs = await SharedPreferences.getInstance();
       final newInjuries = List<String>.from(_injuries)..add(injury.trim());
-      await prefs.setStringList('injuries', newInjuries);
+      await FirestoreService.instance.updateProfile({'injuries': newInjuries});
       setState(() {
         _injuries = newInjuries;
       });
@@ -170,9 +168,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _removeInjury(String injury) async {
-    final prefs = await SharedPreferences.getInstance();
     final newInjuries = List<String>.from(_injuries)..remove(injury);
-    await prefs.setStringList('injuries', newInjuries);
+    await FirestoreService.instance.updateProfile({'injuries': newInjuries});
     setState(() {
       _injuries = newInjuries;
     });

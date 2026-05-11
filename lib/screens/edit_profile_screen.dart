@@ -2,7 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import '../services/firestore_service.dart';
 import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
 
@@ -34,16 +34,16 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   }
 
   Future<void> _loadData() async {
-    final prefs = await SharedPreferences.getInstance();
+    final profileData = await FirestoreService.instance.getProfile();
     setState(() {
-      _profileImagePath = prefs.getString('profileImagePath');
-      _targetWeightController.text = (prefs.getDouble('targetWeight') ?? 60.0).toString();
-      _startedWeightController.text = (prefs.getDouble('startedWeight') ?? 75.0).toString();
+      _profileImagePath = profileData['profileImagePath'] as String?;
+      _targetWeightController.text = (profileData['targetWeight'] as num? ?? 60.0).toString();
+      _startedWeightController.text = (profileData['startedWeight'] as num? ?? 75.0).toString();
       _usernameController.text = _authService.currentUser?.displayName ?? '';
-      _ageController.text = (prefs.getInt('age') ?? 25).toString();
-      _heightController.text = (prefs.getDouble('height') ?? 175.0).toString();
-      _gender = prefs.getString('gender') ?? 'Male';
-      _activityFactor = prefs.getInt('activityFactor') ?? 3;
+      _ageController.text = (profileData['age'] as num? ?? 25).toString();
+      _heightController.text = (profileData['height'] as num? ?? 175.0).toString();
+      _gender = profileData['gender'] as String? ?? 'Male';
+      _activityFactor = profileData['activityFactor'] as int? ?? 3;
     });
   }
 
@@ -63,8 +63,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       final pickedFile = await picker.pickImage(source: ImageSource.gallery);
       
       if (pickedFile != null) {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('profileImagePath', pickedFile.path);
+        await FirestoreService.instance.updateProfile({'profileImagePath': pickedFile.path});
         setState(() {
           _profileImagePath = pickedFile.path;
         });
@@ -89,9 +88,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     
     if (targetWeightStr.isNotEmpty && double.tryParse(targetWeightStr) != null &&
         startedWeightStr.isNotEmpty && double.tryParse(startedWeightStr) != null) {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setDouble('targetWeight', double.parse(targetWeightStr));
-      await prefs.setDouble('startedWeight', double.parse(startedWeightStr));
+      await FirestoreService.instance.updateProfile({
+        'targetWeight': double.parse(targetWeightStr),
+        'startedWeight': double.parse(startedWeightStr),
+      });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Weight settings updated!'), backgroundColor: Colors.green),
@@ -119,11 +119,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     
     if (ageStr.isNotEmpty && int.tryParse(ageStr) != null &&
         heightStr.isNotEmpty && double.tryParse(heightStr) != null) {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setInt('age', int.parse(ageStr));
-      await prefs.setDouble('height', double.parse(heightStr));
-      await prefs.setString('gender', _gender);
-      await prefs.setInt('activityFactor', _activityFactor);
+      await FirestoreService.instance.updateProfile({
+        'age': int.parse(ageStr),
+        'height': double.parse(heightStr),
+        'gender': _gender,
+        'activityFactor': _activityFactor,
+      });
       
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

@@ -1,4 +1,4 @@
-import 'package:shared_preferences/shared_preferences.dart';
+import '../services/firestore_service.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -223,10 +223,12 @@ class _HomeHeaderState extends State<_HomeHeader> {
   }
 
   Future<void> _loadProfileImage() async {
-    final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      _profileImagePath = prefs.getString('profileImagePath');
-    });
+    final profileData = await FirestoreService.instance.getProfile();
+    if (mounted) {
+      setState(() {
+        _profileImagePath = profileData['profileImagePath'] as String?;
+      });
+    }
   }
 
   void _openBleSheet() {

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import '../services/firestore_service.dart';
 import '../theme/app_theme.dart';
 
 class UserFormScreen extends StatefulWidget {
@@ -41,15 +41,16 @@ class _UserFormScreenState extends State<UserFormScreen> {
     final height = double.parse(_heightController.text);
     final weight = double.parse(_weightController.text);
     
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('hasCompletedForm', true);
-    await prefs.setString('gender', _gender);
-    await prefs.setInt('age', age);
-    await prefs.setDouble('height', height);
-    await prefs.setDouble('currentWeight', weight);
-    await prefs.setDouble('startedWeight', weight);
-    await prefs.setDouble('targetWeight', weight - 10.0);
-    await prefs.setInt('activityFactor', _activityFactor);
+    await FirestoreService.instance.updateProfile({
+      'hasCompletedForm': true,
+      'gender': _gender,
+      'age': age,
+      'height': height,
+      'currentWeight': weight,
+      'startedWeight': weight,
+      'targetWeight': weight - 10.0,
+      'activityFactor': _activityFactor,
+    });
     
     if (mounted) {
       Navigator.of(context).pushReplacementNamed('/main');
@@ -58,11 +59,13 @@ class _UserFormScreenState extends State<UserFormScreen> {
 
   Future<void> _skipForm() async {
     setState(() => _isLoading = true);
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('hasCompletedForm', true);
-    await prefs.setDouble('currentWeight', 69.0);
-    await prefs.setDouble('startedWeight', 69.0);
-    await prefs.setDouble('targetWeight', 59.0);
+    
+    await FirestoreService.instance.updateProfile({
+      'hasCompletedForm': true,
+      'currentWeight': 69.0,
+      'startedWeight': 69.0,
+      'targetWeight': 59.0,
+    });
     
     if (mounted) {
       Navigator.of(context).pushReplacementNamed('/main');

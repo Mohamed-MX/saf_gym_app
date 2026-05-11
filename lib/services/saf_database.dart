@@ -3,6 +3,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart' as p;
 import 'muscle_wiki_service.dart';
 import '../models/workout_plan.dart';
+import 'firestore_service.dart';
 
 /// Central sqflite database for the SAF Gym App.
 /// Replaces `ExerciseCacheDb` and `WorkoutPlanService`.
@@ -170,53 +171,24 @@ class SafDatabase {
   // ── Workout Plans (Replaces WorkoutPlanService) ─────────────────────────
 
   Future<List<WorkoutPlan>> getPlans() async {
-    final db = await _database;
-    final rows = await db.query(
-      'workout_plans',
-      orderBy: 'updated_at DESC', // Return newest first
-    );
-    final plans = <WorkoutPlan>[];
-    for (final row in rows) {
-      try {
-        final plan = WorkoutPlan.fromJson(
-            jsonDecode(row['data_json'] as String) as Map<String, dynamic>);
-        plans.add(plan);
-      } catch (_) {}
-    }
-    return plans;
+    return await FirestoreService.instance.getPlans();
   }
 
   Future<void> savePlan(WorkoutPlan plan) async {
-    final db = await _database;
-    await db.insert(
-      'workout_plans',
-      {
-        'id': plan.id,
-        'data_json': jsonEncode(plan.toJson()),
-        'updated_at': DateTime.now().millisecondsSinceEpoch,
-      },
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
+    await FirestoreService.instance.savePlan(plan);
   }
 
   Future<void> deletePlan(String planId) async {
-    final db = await _database;
-    await db.delete(
-      'workout_plans',
-      where: 'id = ?',
-      whereArgs: [planId],
-    );
+    await FirestoreService.instance.deletePlan(planId);
   }
 
   // ── Performance Logs ───────────────────────────────────────────────────
 
   Future<void> logPerformance(Map<String, dynamic> log) async {
-    final db = await _database;
-    await db.insert('performance_logs', log);
+    await FirestoreService.instance.logPerformance(log);
   }
 
   Future<List<Map<String, dynamic>>> getPerformanceLogs() async {
-    final db = await _database;
-    return await db.query('performance_logs', orderBy: 'date_time DESC');
+    return await FirestoreService.instance.getPerformanceLogs();
   }
 }

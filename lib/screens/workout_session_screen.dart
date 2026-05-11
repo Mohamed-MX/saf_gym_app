@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import '../services/firestore_service.dart';
 
 import '../ble/ble_manager.dart';
 import '../logic/rep_game_logic.dart';
@@ -54,9 +54,9 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
   }
 
   Future<void> _loadInjuries() async {
-    final prefs = await SharedPreferences.getInstance();
+    final profileData = await FirestoreService.instance.getProfile();
     setState(() {
-      _injuries = prefs.getStringList('injuries') ?? [];
+      _injuries = (profileData['injuries'] as List?)?.map((e) => e.toString()).toList() ?? [];
     });
   }
 

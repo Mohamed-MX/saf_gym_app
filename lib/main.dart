@@ -15,7 +15,7 @@ import 'screens/login_screen.dart';
 import 'screens/signup_screen.dart';
 import 'screens/forgot_password_screen.dart';
 import 'screens/user_form_screen.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'services/firestore_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -64,18 +64,15 @@ class AuthWrapper extends StatefulWidget {
 
 class _AuthWrapperState extends State<AuthWrapper> {
   bool? _hasCompletedForm;
-
-  @override
-  void initState() {
-    super.initState();
-    _checkFormCompletion();
-  }
+  User? _currentUser;
 
   Future<void> _checkFormCompletion() async {
-    final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      _hasCompletedForm = prefs.getBool('hasCompletedForm') ?? false;
-    });
+    final profileData = await FirestoreService.instance.getProfile();
+    if (mounted) {
+      setState(() {
+        _hasCompletedForm = profileData['hasCompletedForm'] as bool? ?? false;
+      });
+    }
   }
 
   @override
@@ -83,19 +80,31 @@ class _AuthWrapperState extends State<AuthWrapper> {
     return StreamBuilder<User?>(
       stream: AuthService().authStateChanges,
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting || _hasCompletedForm == null) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
             body: Center(child: CircularProgressIndicator()),
           );
         }
-        if (snapshot.hasData) {
-          if (_hasCompletedForm == true) {
+        final user = snapshot.data;
+        if (user != null) {
+          if (_currentUser?.uid != user.uid) {
+            _currentUser = user;
+            _hasCompletedForm = null;
+            _checkFormCompletion();
+          }
+          if (_hasCompletedForm == null) {
+            return const Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            );
+          } else if (_hasCompletedForm == true) {
             return const MainShell();
           } else {
             return const UserFormScreen();
           }
+        } else {
+          _currentUser = null;
+          return const IntroScreen();
         }
-        return const IntroScreen();
       },
     );
   }
