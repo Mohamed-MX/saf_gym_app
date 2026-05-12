@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/firestore_service.dart';
 
@@ -8,7 +10,9 @@ import '../models/workout_plan.dart';
 import '../services/muscle_wiki_service.dart';
 import '../services/saf_database.dart';
 import '../theme/app_theme.dart';
+import '../widgets/ble_sheet.dart';
 import 'exercise_detail_screen.dart';
+
 
 /// Displays a guided workout session for a single [WorkoutDay].
 /// The user can step through each exercise and mark sets as done.
@@ -42,15 +46,23 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
   List<String> _injuries = [];
   final Set<int> _ignoredInjuries = {};
 
+  StreamSubscription<bool>? _connStreamSub;
+
+
   @override
   void initState() {
     super.initState();
     _sessionId = DateTime.now().millisecondsSinceEpoch;
     _lastSetEndTime = DateTime.now();
-    _completedSets =
-        List.filled(widget.day.exercises.length, 0);
+    _completedSets = List.filled(widget.day.exercises.length, 0);
     _loadInjuries();
     _initBle();
+  }
+
+  @override
+  void dispose() {
+    _connStreamSub?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadInjuries() async {
@@ -70,19 +82,28 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
   }
 
   void _initBle() {
-    _bleManager.onDataCallback = (ax, ay, az) {
+    // connectionStream emits true when physical link is up (even if UUID not matched).
+    // Only set _bleConnected = true when charFound (data will actually flow).
+    _connStreamSub = _bleManager.connectionStream.listen((linked) {
       if (!mounted) return;
+      setState(() {
+        _bleConnected = linked && _bleManager.charFound;
+        if (!linked) _isTracking = false;
+      });
+    });
 
-      if (!_bleConnected) {
-        setState(() => _bleConnected = true);
-      }
+    _bleManager.onDisconnectedCallback = () {
+      if (!mounted) return;
+      setState(() {
+        _bleConnected = false;
+        _isTracking = false;
+      });
+    };
 
-      if (!_isTracking) return;
-      
+    _bleManager.onDataCallback = (ax, ay, az) {
+      if (!mounted || !_isTracking) return;
       setState(() {
         _logic.updateSensor(ax, ay, az);
-        
-        // Auto-complete set when reps reached
         if (_logic.reps >= _current.reps) {
           if (_completedSets[_currentIndex] < _current.sets) {
             _completeSet();
@@ -91,8 +112,28 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
         }
       });
     };
-    _bleManager.startScan();
+
+    if (_bleManager.isConnected) {
+      setState(() => _bleConnected = true);
+    }
   }
+
+
+  void _openBleSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => BleConnectionSheet(
+        bleManager: _bleManager,
+        isConnected: _bleConnected,
+        onConnectionChanged: (connected) {
+          if (mounted) setState(() => _bleConnected = connected);
+        },
+      ),
+    );
+  }
+
 
   void _startTracking() {
     setState(() {
@@ -107,8 +148,7 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
   bool get _isLast =>
       _currentIndex == widget.day.exercises.length - 1;
 
-  bool get _allSetsCompleted =>
-      _completedSets[_currentIndex] >= _current.sets;
+
 
   void _completeSet() {
     if (_completedSets[_currentIndex] < _current.sets) {
@@ -316,25 +356,42 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
         foregroundColor: AppTheme.charcoal,
         actions: [
           Padding(
-            padding: const EdgeInsets.only(right: 16),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'Sensor',
-                  style: GoogleFonts.outfit(
+            padding: const EdgeInsets.only(right: 12),
+            child: GestureDetector(
+              onTap: _openBleSheet,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: _bleConnected
+                      ? Colors.green.withValues(alpha: 0.12)
+                      : Colors.redAccent.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
                     color: _bleConnected ? Colors.green : Colors.redAccent,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
+                    width: 1.2,
                   ),
                 ),
-                const SizedBox(width: 6),
-                Icon(
-                  Icons.bluetooth_rounded,
-                  color: _bleConnected ? Colors.green : Colors.redAccent,
-                  size: 20,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.bluetooth_rounded,
+                      color: _bleConnected ? Colors.green : Colors.redAccent,
+                      size: 14,
+                    ),
+                    const SizedBox(width: 5),
+                    Text(
+                      _bleConnected ? 'Connected' : 'No Sensor',
+                      style: GoogleFonts.outfit(
+                        color: _bleConnected ? Colors.green : Colors.redAccent,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
         ],
@@ -356,6 +413,7 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
                 exercise: _current,
                 completedSets: _completedSets[_currentIndex],
                 currentReps: _logic.reps,
+                logic: _logic,
                 bleConnected: _bleConnected,
                 isTracking: _isTracking,
                 isInjured: _isInjured(_current.muscleGroup) && !_ignoredInjuries.contains(_current.exerciseId),
@@ -419,6 +477,7 @@ class _ExerciseCard extends StatelessWidget {
   final PlannedExercise exercise;
   final int completedSets;
   final int currentReps;
+  final RepGameLogic logic;
   final bool bleConnected;
   final bool isTracking;
   final bool isInjured;
@@ -435,6 +494,7 @@ class _ExerciseCard extends StatelessWidget {
     required this.exercise,
     required this.completedSets,
     required this.currentReps,
+    required this.logic,
     required this.bleConnected,
     required this.isTracking,
     required this.isInjured,
@@ -562,16 +622,8 @@ class _ExerciseCard extends StatelessWidget {
 
                   const SizedBox(height: 16),
 
-                  // GIF
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(16),
-                    child: Image.asset(
-                      'assets/flapppy-gym.gif',
-                      fit: BoxFit.cover,
-                      height: 120,
-                      width: double.infinity,
-                    ),
-                  ),
+                  // Game View (Flappy Bird Rhythm)
+                  _FlappyRhythmGame(logic: logic, isTracking: isTracking),
                   const SizedBox(height: 16),
 
                   // Sets × Reps info
@@ -580,7 +632,11 @@ class _ExerciseCard extends StatelessWidget {
                     children: [
                       _StatBlock(label: 'Sets', value: '${exercise.sets}'),
                       const _Divider(),
-                      _StatBlock(label: 'Reps', value: '${exercise.reps}'),
+                      _StatBlock(
+                        label: 'Reps', 
+                        value: isTracking ? '$currentReps' : '${exercise.reps}',
+                        valueColor: isTracking ? AppTheme.primaryBlue : null,
+                      ),
                       const _Divider(),
                       _StatBlock(
                           label: 'Done',
@@ -866,3 +922,98 @@ class _Btn extends StatelessWidget {
   }
 }
 
+class _FlappyRhythmGame extends StatefulWidget {
+  final RepGameLogic logic;
+  final bool isTracking;
+
+  const _FlappyRhythmGame({required this.logic, required this.isTracking});
+
+  @override
+  State<_FlappyRhythmGame> createState() => _FlappyRhythmGameState();
+}
+
+class _FlappyRhythmGameState extends State<_FlappyRhythmGame> with SingleTickerProviderStateMixin {
+  late Ticker _ticker;
+
+  @override
+  void initState() {
+    super.initState();
+    _ticker = createTicker((_) {
+      if (widget.isTracking) {
+        setState(() {}); // Triggers LayoutBuilder to call tick and redraw
+      }
+    });
+    _ticker.start();
+  }
+
+  @override
+  void dispose() {
+    _ticker.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 220,
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: const Color(0xFF121212), // Black background
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.lightGrey.withValues(alpha: 0.2), width: 2),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(14),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            if (widget.isTracking) {
+              widget.logic.tick(constraints.maxWidth, constraints.maxHeight);
+            }
+            return Stack(
+              children: [
+                // Draw Stars
+                ...widget.logic.items.map((item) {
+                  if (item.collected) return const SizedBox.shrink(); // Hide if collected
+                  
+                  return Positioned(
+                    left: item.x,
+                    top: (item.yPos * constraints.maxHeight) - 23, // Center the 46x46 star
+                    child: const Icon(
+                      Icons.star_rounded,
+                      color: Colors.blueAccent,
+                      size: 46,
+                      shadows: [
+                        Shadow(color: Colors.blue, blurRadius: 12)
+                      ],
+                    ),
+                  );
+                }),
+                
+                // Draw Bird (Ball)
+                Positioned(
+                  left: kBirdX * constraints.maxWidth - (kBirdRadius / 2),
+                  top: widget.logic.ballY * constraints.maxHeight - (kBirdRadius / 2),
+                  child: Container(
+                    width: kBirdRadius,
+                    height: kBirdRadius,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.white.withValues(alpha: 0.6),
+                          blurRadius: 12,
+                          spreadRadius: 2,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
