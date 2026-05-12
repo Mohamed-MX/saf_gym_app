@@ -139,6 +139,10 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
     setState(() {
       _isTracking = true;
       _logic.reset();
+      
+      final name = _current.name.toLowerCase();
+      final group = _current.muscleGroup?.toLowerCase() ?? '';
+      _logic.useYZOnly = name.contains('shoulder') || group.contains('shoulder');
     });
   }
 
@@ -977,11 +981,11 @@ class _FlappyRhythmGameState extends State<_FlappyRhythmGame> with SingleTickerP
                   
                   return Positioned(
                     left: item.x,
-                    top: (item.yPos * constraints.maxHeight) - 23, // Center the 46x46 star
+                    top: (item.yPos * constraints.maxHeight) - 25.5, // Center the 51x51 star
                     child: const Icon(
                       Icons.star_rounded,
                       color: Colors.blueAccent,
-                      size: 46,
+                      size: 51,
                       shadows: [
                         Shadow(color: Colors.blue, blurRadius: 12)
                       ],

@@ -29,10 +29,12 @@ class StarItem {
 }
 
 class RepGameLogic {
-  double ballY = invertSensorMovement ? 0.12 : 0.88; // Start at the correct resting position
+  double ballY = invertSensorMovement ? 0.158 : 0.842; // Start at the correct resting position
   final List<StarItem> items = [];
   int pipeIndex = 0;
   int reps = 0;
+  
+  bool useYZOnly = false;
 
   bool initialized = false;
   double sAx = 0, sAy = 0, sAz = 0;
@@ -49,7 +51,7 @@ class RepGameLogic {
 
   void reset() {
     reps = 0;
-    ballY = invertSensorMovement ? 0.12 : 0.88;
+    ballY = invertSensorMovement ? 0.158 : 0.842;
     items.clear();
     pipeIndex = 0;
     
@@ -81,7 +83,13 @@ class RepGameLogic {
     double dx = sAx - startAx;
     double dy = sAy - startAy;
     double dz = sAz - startAz;
-    double currentDist = sqrt(dx * dx + dy * dy + dz * dz);
+    
+    double currentDist;
+    if (useYZOnly) {
+      currentDist = sqrt(dy * dy + dz * dz);
+    } else {
+      currentDist = sqrt(dx * dx + dy * dy + dz * dz);
+    }
     
     if (currentDist > maxDist) {
       maxDist = currentDist;
@@ -114,12 +122,12 @@ class RepGameLogic {
 
 
     // Anchored mapping
-    double defaultY = invertSensorMovement ? 0.12 : 0.88;
+    double defaultY = invertSensorMovement ? 0.158 : 0.842;
     double targetY = defaultY;
     if (rom > 10.0) {
       targetY = invertSensorMovement
-          ? 0.12 + (normalizedDist * 0.76)  // Moves DOWN to 0.88
-          : 0.88 - (normalizedDist * 0.76); // Moves UP to 0.12
+          ? 0.158 + (normalizedDist * 0.684)  // Moves DOWN to 0.842
+          : 0.842 - (normalizedDist * 0.684); // Moves UP to 0.158
     }
         
     targetY = targetY.clamp(0.0, 1.0);
@@ -132,7 +140,7 @@ class RepGameLogic {
     // Scale speed by ROM so it's consistent regardless of the physical sensor values.
     // Multiplier heavily increased so user movement actually drives the game clearly.
     double normalizedSpeed = calibrationRom > 10.0 ? (speedMagnitude / calibrationRom) : 0;
-    double targetSpeed = (normalizedSpeed * 1500.0).clamp(0.0, 4.0);
+    double targetSpeed = (normalizedSpeed * 1200.0).clamp(0.0, 3.2);
     
     // Flywheel smoothing: Ramp up quickly, glide down smoothly to prevent stuttering
     if (targetSpeed > currentPipeSpeed) {
@@ -168,8 +176,8 @@ class RepGameLogic {
     items.removeWhere((p) => p.x < -kPipeWidth);
 
     // Only spawn stars at the extremes (Start and Peak)
-    double startPos = invertSensorMovement ? 0.12 : 0.88;
-    double peakPos = invertSensorMovement ? 0.88 : 0.12;
+    double startPos = invertSensorMovement ? 0.158 : 0.842;
+    double peakPos = invertSensorMovement ? 0.842 : 0.158;
     List<double> currentPattern = [startPos, peakPos];
 
     // Spawn new stars
