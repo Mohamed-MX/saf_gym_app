@@ -27,6 +27,25 @@ const _muscleOverlays = <String, String>{
   'lower-back': 'lower back simple.svg',
 };
 
+const _muscleOverlaysFemale = <String, String>{
+  'abdominals': 'abs simple f.svg',
+  'obliques': 'Obliques simple f.svg',
+  'chest': 'chest simple F.svg',
+  'front-shoulders': 'shoulder simple f.svg',
+  'biceps': 'Biceps Simple f.svg',
+  'forearms': 'Forearm Simple f.svg',
+  'quads': 'thigh simple f.svg',
+  'calves': 'calf simple f.svg',
+  'traps': 'traps simple f.svg',
+  'traps-middle': 'middle traps simple f.svg',
+  'lats': 'lats simple f.svg',
+  'rear-shoulders': 'rear delts simple f.svg',
+  'triceps': 'triceps simple f.svg',
+  'hamstrings': 'thigh simple f.svg',
+  'glutes': 'glutes simple.svg',
+  'lower-back': 'lower back simple f.svg',
+};
+
 class _MuscleRegion {
   final String id;
   final String label;
@@ -255,13 +274,18 @@ class _ExercisePickerViewState extends State<_ExercisePickerView> with TickerPro
                         _muscleRegions.any((r) => r.id == muscleId && r.isFront == vm.isFront))
                       AnimatedBuilder(
                         animation: _pulseAnim,
-                        builder: (_, _) => Opacity(
-                          opacity: _pulseAnim.value,
-                          child: SvgPicture.asset(
-                            'assets/SVGs/${_muscleOverlays[muscleId]}',
-                            fit: BoxFit.contain,
-                          ),
-                        ),
+                        builder: (_, _) {
+                          final assetName = vm.isMale
+                              ? _muscleOverlays[muscleId]
+                              : _muscleOverlaysFemale[muscleId];
+                          return Opacity(
+                            opacity: _pulseAnim.value,
+                            child: SvgPicture.asset(
+                              'assets/SVGs/$assetName',
+                              fit: BoxFit.contain,
+                            ),
+                          );
+                        },
                       ),
                   ...regions.map((region) {
                     final left = region.hitRect.left * w;
@@ -406,17 +430,35 @@ class _ExercisePickerViewState extends State<_ExercisePickerView> with TickerPro
                         if (vm.selectedMuscles.isNotEmpty ||
                             vm.selectedCategory != null ||
                             vm.selectedDifficulty != null)
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: TextButton.icon(
-                              onPressed: () => context.read<ExercisePickerViewModel>().clearFilters(),
-                              icon: const Icon(Icons.clear_all, size: 16),
-                              label: const Text('Clear filters'),
-                              style: TextButton.styleFrom(
-                                foregroundColor: AppTheme.mediumGrey,
-                                padding: EdgeInsets.zero,
+                          Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              if (vm.selectedMuscles.isNotEmpty)
+                                Text(
+                                  vm.selectedMuscles
+                                      .map((id) => _muscleRegions
+                                          .firstWhere((r) => r.id == id)
+                                          .label)
+                                      .join(', '),
+                                  style: GoogleFonts.outfit(
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 14,
+                                    color: AppTheme.primaryBlue,
+                                  ),
+                                ),
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: TextButton.icon(
+                                  onPressed: () => context.read<ExercisePickerViewModel>().clearFilters(),
+                                  icon: const Icon(Icons.clear_all, size: 16),
+                                  label: const Text('Clear filters'),
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: AppTheme.mediumGrey,
+                                    padding: EdgeInsets.zero,
+                                  ),
+                                ),
                               ),
-                            ),
+                            ],
                           ),
                       ],
                     ),

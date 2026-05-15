@@ -400,10 +400,10 @@ class _HomeHeaderState extends State<_HomeHeader> {
                   ),
                   const SizedBox(width: 12),
                   _StatCard(
-                    icon: Icons.fitness_center_rounded,
-                    iconColor: AppTheme.charcoal,
+                    icon: Icons.star_rounded,
+                    iconColor: AppTheme.primaryBlue,
                     value: widget.vm.totalReps.toString(),
-                    label: 'Total Reps',
+                    label: 'Stars Collected',
                   ),
                   const SizedBox(width: 12),
                   _StatCard(
