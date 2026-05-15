@@ -22,7 +22,7 @@ const _muscleOverlays = <String, String>{
   'lats': 'lats simple.svg',
   'rear-shoulders': 'rear delts simple.svg',
   'triceps': 'triceps simple.svg',
-  'hamstrings': 'thigh simple.svg',
+  'hamstrings': 'hamstrings.svg',
   'glutes': 'glutes simple.svg',
   'lower-back': 'lower back simple.svg',
 };
@@ -41,8 +41,8 @@ const _muscleOverlaysFemale = <String, String>{
   'lats': 'lats simple f.svg',
   'rear-shoulders': 'rear delts simple f.svg',
   'triceps': 'triceps simple f.svg',
-  'hamstrings': 'thigh simple f.svg',
-  'glutes': 'glutes simple.svg',
+  'hamstrings': 'hamstrings f.svg',
+  'glutes': 'glutes simple f.svg',
   'lower-back': 'lower back simple f.svg',
 };
 
