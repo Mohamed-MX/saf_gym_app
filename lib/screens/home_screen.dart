@@ -402,7 +402,7 @@ class _HomeHeaderState extends State<_HomeHeader> {
                   _StatCard(
                     icon: Icons.star_rounded,
                     iconColor: AppTheme.primaryBlue,
-                    value: widget.vm.totalReps.toString(),
+                    value: widget.vm.totalStars.toString(),
                     label: 'Stars Collected',
                   ),
                   const SizedBox(width: 12),

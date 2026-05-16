@@ -11,11 +11,11 @@ class HomeViewModel extends ChangeNotifier {
   late DateTime _today;
 
   int _dayStreak = 0;
-  int _totalReps = 0;
+  int _totalStars = 0;
   int _totalMinutes = 0;
 
   int get dayStreak => _dayStreak;
-  int get totalReps => _totalReps;
+  int get totalStars => _totalStars;
   int get totalMinutes => _totalMinutes;
 
   HomeViewModel() {
@@ -63,19 +63,19 @@ class HomeViewModel extends ChangeNotifier {
     final logs = await db.getPerformanceLogs();
     final plans = await db.getPlans();
 
-    int reps = 0;
+    int stars = 0;
     int seconds = 0;
     Set<DateTime> workoutDates = {};
 
     for (var log in logs) {
-      reps += (log['reps'] as int? ?? 0);
+      stars += (log['stars'] as int? ?? 0);
       seconds += (log['time_taken_seconds'] as int? ?? 0);
       
       final dt = DateTime.fromMillisecondsSinceEpoch(log['date_time']);
       workoutDates.add(DateTime(dt.year, dt.month, dt.day));
     }
 
-    _totalReps = reps;
+    _totalStars = stars;
     _totalMinutes = seconds ~/ 60;
 
     Set<String> scheduledDays = {};

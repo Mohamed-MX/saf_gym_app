@@ -157,6 +157,7 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
   void _completeSet() {
     if (_completedSets[_currentIndex] < _current.sets) {
       final int repsDone = _isTracking && _logic.reps > 0 ? _logic.reps : _current.reps;
+      final int starsDone = _isTracking ? _logic.items.where((i) => i.collected).length : 0;
       final now = DateTime.now();
       final timeTaken = now.difference(_lastSetEndTime).inSeconds;
       
@@ -167,6 +168,7 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
         'workout_name': widget.planName,
         'exercise_name': _current.name,
         'reps': repsDone,
+        'stars': starsDone,
         'weight': _current.weights[_completedSets[_currentIndex]],
       });
 
