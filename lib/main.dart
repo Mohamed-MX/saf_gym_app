@@ -130,13 +130,22 @@ class _MainShellState extends State<MainShell> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: IndexedStack(
-        index: _currentIndex,
-        children: _screens,
-      ),
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
+    return PopScope(
+      canPop: _currentIndex == 0,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) {
+          setState(() {
+            _currentIndex = 0;
+          });
+        }
+      },
+      child: Scaffold(
+        body: IndexedStack(
+          index: _currentIndex,
+          children: _screens,
+        ),
+        bottomNavigationBar: Container(
+          decoration: BoxDecoration(
           color: AppTheme.white,
           boxShadow: [
             BoxShadow(
@@ -172,7 +181,7 @@ class _MainShellState extends State<MainShell> {
           ),
         ),
       ),
-    );
+    ));
   }
 
   Widget _buildNavItem({

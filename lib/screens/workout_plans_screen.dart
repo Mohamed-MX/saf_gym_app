@@ -40,15 +40,23 @@ class _WorkoutPlansView extends StatelessWidget {
       body: SafeArea(
         child: vm.isLoading
           ? const Center(child: CircularProgressIndicator(color: AppTheme.primaryBlue))
-          : vm.plans.isEmpty
-              ? _buildEmpty(context)
-              : RefreshIndicator(
-                  color: AppTheme.primaryBlue,
-                  onRefresh: () => context.read<WorkoutPlansViewModel>().loadPlans(),
-                  child: ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(24, 8, 24, 120),
-                    itemCount: vm.plans.length,
-                    itemBuilder: (context, index) {
+          : RefreshIndicator(
+              color: AppTheme.primaryBlue,
+              onRefresh: () => context.read<WorkoutPlansViewModel>().loadPlans(),
+              child: vm.plans.isEmpty
+                  ? SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      child: Container(
+                        height: MediaQuery.of(context).size.height * 0.7,
+                        alignment: Alignment.center,
+                        child: _buildEmpty(context),
+                      ),
+                    )
+                  : ListView.builder(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.fromLTRB(24, 8, 24, 120),
+                      itemCount: vm.plans.length,
+                      itemBuilder: (context, index) {
                       return _PlanCard(
                         plan: vm.plans[index],
                         onDelete: () => _confirmDelete(

@@ -33,6 +33,7 @@ class RepGameLogic {
   final List<StarItem> items = [];
   int pipeIndex = 0;
   int reps = 0;
+  int totalStarsCollected = 0;
   
   bool useYZOnly = false;
 
@@ -51,6 +52,7 @@ class RepGameLogic {
 
   void reset() {
     reps = 0;
+    totalStarsCollected = 0;
     ballY = invertSensorMovement ? 0.158 : 0.842;
     items.clear();
     pipeIndex = 0;
@@ -168,6 +170,7 @@ class RepGameLogic {
         double starY = items[i].yPos * screenH;
         if ((bY - starY).abs() < 40.0) { // 40px collection radius
           items[i].collected = true;
+          totalStarsCollected++;
         }
       }
     }

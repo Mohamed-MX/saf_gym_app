@@ -75,8 +75,16 @@ class _HomeView extends StatelessWidget {
       backgroundColor: AppTheme.offWhite,
       body: SafeArea(
         top: false,
-        child: CustomScrollView(
-        slivers: [
+        child: RefreshIndicator(
+          onRefresh: () async {
+            if (context.mounted) {
+              context.read<HomeViewModel>().loadStats();
+              context.read<WorkoutPlansViewModel>().loadPlans();
+            }
+          },
+          child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: [
           // ── Blue Header ──────────────────────────────────────────────────
           SliverToBoxAdapter(
             child: _HomeHeader(vm: vm),
@@ -185,8 +193,9 @@ class _HomeView extends StatelessWidget {
               ),
             ),
           ),
-        ],
-      ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -444,42 +453,54 @@ class _StatCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
-        decoration: BoxDecoration(
-          color: AppTheme.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.08),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Column(
-          children: [
-            Icon(icon, color: iconColor, size: 22),
-            const SizedBox(height: 6),
-            Text(
-              value,
-              style: GoogleFonts.outfit(
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-                color: AppTheme.charcoal,
+      child: AspectRatio(
+        aspectRatio: 1.0,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+          decoration: BoxDecoration(
+            color: AppTheme.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.08),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
               ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 11,
-                color: AppTheme.mediumGrey,
-                fontWeight: FontWeight.w500,
+            ],
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, color: iconColor, size: 28),
+              const SizedBox(height: 8),
+              Text(
+                value,
+                style: GoogleFonts.outfit(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: AppTheme.charcoal,
+                ),
               ),
-              textAlign: TextAlign.center,
-            ),
-          ],
+              const SizedBox(height: 4),
+              Expanded(
+                child: Align(
+                  alignment: Alignment.topCenter,
+                  child: Text(
+                    label,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: AppTheme.mediumGrey,
+                      fontWeight: FontWeight.w500,
+                      height: 1.1,
+                    ),
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

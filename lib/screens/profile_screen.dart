@@ -19,13 +19,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final _authService = AuthService();
   
   String? _profileImagePath;
-  double _currentWeight = 69.0;
-  double _targetWeight = 60.0;
-  double _startedWeight = 75.0;
-  String _gender = 'Male';
-  int _age = 25;
-  double _height = 175.0;
-  int _activityFactor = 3;
+  double? _currentWeight;
+  double? _targetWeight;
+  double? _startedWeight;
+  String? _gender;
+  int? _age;
+  double? _height;
+  int? _activityFactor;
   
   // Mock data for workouts
   int _startedWorkouts = 65;
@@ -60,13 +60,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     setState(() {
       _profileImagePath = profileData['profileImagePath'] as String?;
-      _currentWeight = profileData['currentWeight'] as double? ?? 69.0;
-      _targetWeight = profileData['targetWeight'] as double? ?? 60.0;
-      _startedWeight = profileData['startedWeight'] as double? ?? 75.0;
-      _gender = profileData['gender'] as String? ?? 'Male';
-      _age = profileData['age'] as int? ?? 25;
-      _height = profileData['height'] as double? ?? 175.0;
-      _activityFactor = profileData['activityFactor'] as int? ?? 3;
+      _currentWeight = profileData['currentWeight'] as double?;
+      _targetWeight = profileData['targetWeight'] as double?;
+      _startedWeight = profileData['startedWeight'] as double?;
+      _gender = profileData['gender'] as String?;
+      _age = profileData['age'] as int?;
+      _height = profileData['height'] as double?;
+      _activityFactor = profileData['activityFactor'] as int?;
       _injuries = (profileData['injuries'] as List?)?.map((e) => e.toString()).toList() ?? [];
       
       _completedWorkouts = completedDays.length;
@@ -76,7 +76,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _logNewWeight() async {
-    final TextEditingController controller = TextEditingController(text: _currentWeight.toString());
+    final TextEditingController controller = TextEditingController(text: _currentWeight?.toString() ?? '');
     final newWeightStr = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
@@ -84,7 +84,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         title: Text('Log New Weight', style: GoogleFonts.outfit(color: Colors.white)),
         content: TextField(
           controller: controller,
-          keyboardType: TextInputType.numberWithOptions(decimal: true),
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
           style: const TextStyle(color: Colors.white),
           decoration: const InputDecoration(
             labelText: 'Weight in Kg',
@@ -109,15 +109,36 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     if (newWeightStr != null && double.tryParse(newWeightStr) != null) {
       final newWeight = double.parse(newWeightStr);
-      await FirestoreService.instance.updateProfile({'currentWeight': newWeight});
+      final updates = <String, dynamic>{'currentWeight': newWeight};
+      if (_startedWeight == null) {
+        updates['startedWeight'] = newWeight;
+      }
+      
+      await FirestoreService.instance.updateProfile(updates);
       setState(() {
         _currentWeight = newWeight;
+        if (_startedWeight == null) {
+          _startedWeight = newWeight;
+        }
       });
     }
   }
 
   Future<void> _addInjury() async {
-    String? selectedInjury = 'Shoulder, Arm';
+    String? selectedInjury = 'Shoulder';
+    final availableInjuries = ['Shoulder', 'Arm', 'Forearm (Wrist)', 'Legs', 'Back', 'Chest']
+        .where((i) => !_injuries.contains(i))
+        .toList();
+        
+    if (availableInjuries.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('All available injuries are already added!'), backgroundColor: Colors.green),
+      );
+      return;
+    }
+    
+    selectedInjury = availableInjuries.first;
+
     final injury = await showDialog<String>(
       context: context,
       builder: (context) {
@@ -130,7 +151,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               dropdownColor: const Color(0xFF3B3B4F),
               style: const TextStyle(color: Colors.white),
               isExpanded: true,
-              items: ['Shoulder, Arm', 'Back, Chest', 'Legs']
+              items: availableInjuries
                   .map((e) => DropdownMenuItem(value: e, child: Text(e)))
                   .toList(),
               onChanged: (val) {
@@ -153,7 +174,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       },
     );
 
-    if (injury != null && injury.trim().isNotEmpty) {
+    if (injury != null && injury.trim().isNotEmpty && !_injuries.contains(injury.trim())) {
       final newInjuries = List<String>.from(_injuries)..add(injury.trim());
       await FirestoreService.instance.updateProfile({'injuries': newInjuries});
       setState(() {
@@ -185,10 +206,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final username = _authService.currentUser?.displayName ?? 'User';
+    bool isProfileIncomplete = _currentWeight == null || _targetWeight == null || _height == null || _age == null || _gender == null;
+
     // Calculate weight progress (clamped between 0 and 1)
     double weightProgress = 0.0;
-    if (_startedWeight != _targetWeight) {
-      weightProgress = (_startedWeight - _currentWeight) / (_startedWeight - _targetWeight);
+    if (_startedWeight != null && _targetWeight != null && _currentWeight != null && _startedWeight != _targetWeight) {
+      weightProgress = (_startedWeight! - _currentWeight!) / (_startedWeight! - _targetWeight!);
       weightProgress = weightProgress.clamp(0.0, 1.0);
     }
     
@@ -199,31 +222,35 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
     
     // Calculate BMI
-    double heightInM = _height / 100;
-    double bmi = 0;
-    if (heightInM > 0) {
-      bmi = _currentWeight / (heightInM * heightInM);
+    double? bmi;
+    if (_height != null && _currentWeight != null && _height! > 0) {
+      double heightInM = _height! / 100;
+      bmi = _currentWeight! / (heightInM * heightInM);
     }
     
     // Calculate BMR
-    double bmr = (10 * _currentWeight) + (6.25 * _height) - (5 * _age);
-    if (_gender == 'Male') {
-      bmr += 5;
-    } else {
-      bmr -= 161;
+    double? tdee;
+    double? targetCalories;
+    if (_currentWeight != null && _height != null && _age != null && _gender != null && _activityFactor != null) {
+      double bmr = (10 * _currentWeight!) + (6.25 * _height!) - (5 * _age!);
+      if (_gender == 'Male') {
+        bmr += 5;
+      } else {
+        bmr -= 161;
+      }
+      
+      // Calculate TDEE
+      double multiplier = 1.2;
+      switch (_activityFactor) {
+        case 1: multiplier = 1.2; break;
+        case 2: multiplier = 1.375; break;
+        case 3: multiplier = 1.55; break;
+        case 4: multiplier = 1.725; break;
+        case 5: multiplier = 1.9; break;
+      }
+      tdee = bmr * multiplier;
+      targetCalories = tdee - 500;
     }
-    
-    // Calculate TDEE
-    double multiplier = 1.2;
-    switch (_activityFactor) {
-      case 1: multiplier = 1.2; break;
-      case 2: multiplier = 1.375; break;
-      case 3: multiplier = 1.55; break;
-      case 4: multiplier = 1.725; break;
-      case 5: multiplier = 1.9; break;
-    }
-    double tdee = bmr * multiplier;
-    double targetCalories = tdee - 500;
 
     return Scaffold(
       backgroundColor: AppTheme.primaryBlue,
@@ -281,6 +308,44 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               const SizedBox(height: 32),
 
+              if (isProfileIncomplete)
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.amber.shade700),
+                  ),
+                  child: Column(
+                    children: [
+                      const Icon(Icons.warning_amber_rounded, color: Colors.amber, size: 32),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Your profile is incomplete!',
+                        style: GoogleFonts.outfit(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.amber.shade700,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      ElevatedButton(
+                        onPressed: () async {
+                          await Navigator.push(context, MaterialPageRoute(builder: (_) => const EditProfileScreen()));
+                          _loadProfileData();
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.primaryBlue,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        child: const Text('Complete Profile'),
+                      ),
+                    ],
+                  ),
+                ),
+
               // WEIGHT Card
               Container(
                 padding: const EdgeInsets.all(20),
@@ -331,9 +396,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        _buildStatColumn('Started', '${_startedWeight.toStringAsFixed(0)}Kg'),
-                        _buildStatColumn('Current', '${_currentWeight.toStringAsFixed(0)}Kg'),
-                        _buildStatColumn('Target', '${_targetWeight.toStringAsFixed(0)}Kg'),
+                        _buildStatColumn('Started', _startedWeight != null ? '${_startedWeight!.toStringAsFixed(0)}Kg' : '--'),
+                        _buildStatColumn('Current', _currentWeight != null ? '${_currentWeight!.toStringAsFixed(0)}Kg' : '--'),
+                        _buildStatColumn('Target', _targetWeight != null ? '${_targetWeight!.toStringAsFixed(0)}Kg' : '--'),
                       ],
                     ),
                   ],
@@ -373,8 +438,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        _buildStatColumn('BMI', bmi.toStringAsFixed(1)),
-                        _buildStatColumn('TDEE', '${tdee.toStringAsFixed(0)} kcal'),
+                        _buildStatColumn('BMI', bmi != null ? bmi.toStringAsFixed(1) : '--'),
+                        _buildStatColumn('TDEE', tdee != null ? '${tdee.toStringAsFixed(0)} kcal' : '--'),
                       ],
                     ),
                     const SizedBox(height: 16),
@@ -385,7 +450,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
-                        'Recommendation: Consume ~${targetCalories.toStringAsFixed(0)} calories daily (500 deficit) to safely reach your target weight of ${_targetWeight.toStringAsFixed(0)}kg.',
+                        targetCalories != null && _targetWeight != null
+                            ? 'Recommendation: Consume ~${targetCalories.toStringAsFixed(0)} calories daily (500 deficit) to safely reach your target weight of ${_targetWeight!.toStringAsFixed(0)}kg.'
+                            : 'Recommendation: Please complete your profile to receive calorie recommendations.',
                         style: const TextStyle(color: Colors.white, fontSize: 13),
                       ),
                     ),

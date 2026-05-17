@@ -1,4 +1,4 @@
-import 'dart:async';
+ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -72,12 +72,34 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
     });
   }
 
-  bool _isInjured(String? muscleGroup) {
-    if (muscleGroup == null) return false;
-    final group = muscleGroup.toLowerCase();
-    if (_injuries.contains('Shoulder, Arm') && (group.contains('shoulder') || group.contains('bicep') || group.contains('tricep') || group.contains('forearm') || group.contains('arm'))) return true;
-    if (_injuries.contains('Back, Chest') && (group.contains('chest') || group.contains('lat') || group.contains('back') || group.contains('trap'))) return true;
-    if (_injuries.contains('Legs') && (group.contains('leg') || group.contains('quad') || group.contains('hamstring') || group.contains('glute') || group.contains('calf') || group.contains('calves'))) return true;
+  bool _isInjured(PlannedExercise exercise) {
+    final group = (exercise.muscleGroup ?? '').toLowerCase();
+    final name = exercise.name.toLowerCase();
+    final text = '$group $name';
+    
+    if (_injuries.contains('Shoulder')) {
+      if (text.contains('shoulder') || text.contains('delt')) return true;
+    }
+    if (_injuries.contains('Arm')) {
+      if (text.contains('bicep') || text.contains('tricep') || text.contains('arm')) return true;
+    }
+    if (_injuries.contains('Forearm (Wrist)')) {
+      if (text.contains('forearm') || text.contains('wrist')) return true;
+    }
+    if (_injuries.contains('Legs')) {
+      if (text.contains('leg') || text.contains('quad') || text.contains('hamstring') || text.contains('glute') || text.contains('calf') || text.contains('calves')) return true;
+    }
+    if (_injuries.contains('Back')) {
+      if (text.contains('lat') || text.contains('back') || text.contains('trap')) return true;
+    }
+    if (_injuries.contains('Chest')) {
+      if (text.contains('chest') || text.contains('pec')) return true;
+    }
+    
+    // Fallbacks for older combined selections
+    if (_injuries.contains('Shoulder, Arm') && (text.contains('shoulder') || text.contains('delt') || text.contains('bicep') || text.contains('tricep') || text.contains('forearm') || text.contains('arm'))) return true;
+    if (_injuries.contains('Back, Chest') && (text.contains('chest') || text.contains('pec') || text.contains('lat') || text.contains('back') || text.contains('trap'))) return true;
+    
     return false;
   }
 
@@ -157,7 +179,7 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
   void _completeSet() {
     if (_completedSets[_currentIndex] < _current.sets) {
       final int repsDone = _isTracking && _logic.reps > 0 ? _logic.reps : _current.reps;
-      final int starsDone = _isTracking ? _logic.items.where((i) => i.collected).length : 0;
+      final int starsDone = _isTracking ? _logic.totalStarsCollected : 0;
       final now = DateTime.now();
       final timeTaken = now.difference(_lastSetEndTime).inSeconds;
       
@@ -422,7 +444,7 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
                 logic: _logic,
                 bleConnected: _bleConnected,
                 isTracking: _isTracking,
-                isInjured: _isInjured(_current.muscleGroup) && !_ignoredInjuries.contains(_current.exerciseId),
+                isInjured: _isInjured(_current) && !_ignoredInjuries.contains(_current.exerciseId),
                 onStartTracking: _startTracking,
                 onCompleteSet: _completeSet,
                 onWeightChanged: _updateWeight,
@@ -728,14 +750,9 @@ class _ExerciseCard extends StatelessWidget {
                             const Spacer(),
                             _WeightControl(
                               value: exercise.weights[i],
-                              onDecrement: () {
-                                if (exercise.weights[i] > 0 && onWeightChanged != null) {
-                                  onWeightChanged!(i, exercise.weights[i] - 1.0);
-                                }
-                              },
-                              onIncrement: () {
+                              onChanged: (newWeight) {
                                 if (onWeightChanged != null) {
-                                  onWeightChanged!(i, exercise.weights[i] + 1.0);
+                                  onWeightChanged!(i, newWeight);
                                 }
                               },
                             ),
@@ -875,33 +892,87 @@ class _Divider extends StatelessWidget {
   }
 }
 
-class _WeightControl extends StatelessWidget {
+class _WeightControl extends StatefulWidget {
   final double value;
-  final VoidCallback onDecrement;
-  final VoidCallback onIncrement;
+  final ValueChanged<double> onChanged;
 
   const _WeightControl({
     required this.value,
-    required this.onDecrement,
-    required this.onIncrement,
+    required this.onChanged,
   });
 
   @override
+  State<_WeightControl> createState() => _WeightControlState();
+}
+
+class _WeightControlState extends State<_WeightControl> {
+  late TextEditingController _controller;
+  final FocusNode _focusNode = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: _formatValue(widget.value));
+    _focusNode.addListener(() {
+      if (!_focusNode.hasFocus) {
+        final val = double.tryParse(_controller.text) ?? 0.0;
+        widget.onChanged(val);
+        _controller.text = _formatValue(val);
+      }
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant _WeightControl oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.value != widget.value && !_focusNode.hasFocus) {
+      _controller.text = _formatValue(widget.value);
+    }
+  }
+
+  String _formatValue(double v) {
+    return v.toStringAsFixed(v.truncateToDouble() == v ? 0 : 1);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        _Btn(icon: Icons.remove, onTap: onDecrement),
-        SizedBox(
-          width: 36,
-          child: Text(
-            value.toStringAsFixed(value.truncateToDouble() == value ? 0 : 1),
-            textAlign: TextAlign.center,
-            style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 13),
+    return SizedBox(
+      width: 50,
+      height: 30,
+      child: TextField(
+        controller: _controller,
+        focusNode: _focusNode,
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        textAlign: TextAlign.center,
+        style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 13),
+        decoration: InputDecoration(
+          contentPadding: EdgeInsets.zero,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(4),
+            borderSide: const BorderSide(color: AppTheme.lightGrey),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(4),
+            borderSide: const BorderSide(color: AppTheme.lightGrey),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(4),
+            borderSide: const BorderSide(color: AppTheme.primaryBlue),
           ),
         ),
-        _Btn(icon: Icons.add, onTap: onIncrement),
-      ],
+        onSubmitted: (val) {
+          final newVal = double.tryParse(val) ?? 0.0;
+          widget.onChanged(newVal);
+          _controller.text = _formatValue(newVal);
+        },
+      ),
     );
   }
 }

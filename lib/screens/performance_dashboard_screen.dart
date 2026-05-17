@@ -280,11 +280,14 @@ class _PerformanceDashboardScreenState extends State<PerformanceDashboardScreen>
           : Column(
               children: [
                 Expanded(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
+                  child: RefreshIndicator(
+                    onRefresh: _loadData,
+                    child: SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
                   // Filter Chips
                   SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
@@ -455,6 +458,7 @@ class _PerformanceDashboardScreenState extends State<PerformanceDashboardScreen>
                       ],
                     ),
                   ),
+                ),
                 ),
                 // Sticky Summary Stats
                 Container(

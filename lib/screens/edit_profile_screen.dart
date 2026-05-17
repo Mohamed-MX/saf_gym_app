@@ -21,8 +21,19 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final _ageController = TextEditingController();
   final _heightController = TextEditingController();
   
-  String _gender = 'Male';
-  int _activityFactor = 3;
+  String? _gender;
+  int? _activityFactor;
+  DateTime? _dob;
+  
+  List<String> _injuries = [];
+  final List<String> _availableInjuries = [
+    'Shoulder',
+    'Arm',
+    'Forearm (Wrist)',
+    'Legs',
+    'Back',
+    'Chest'
+  ];
   
   String? _profileImagePath;
   bool _isLoading = false;
@@ -37,13 +48,19 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     final profileData = await FirestoreService.instance.getProfile();
     setState(() {
       _profileImagePath = profileData['profileImagePath'] as String?;
-      _targetWeightController.text = (profileData['targetWeight'] as num? ?? 60.0).toString();
-      _startedWeightController.text = (profileData['startedWeight'] as num? ?? 75.0).toString();
+      _targetWeightController.text = profileData['targetWeight'] != null ? (profileData['targetWeight'] as num).toString() : '';
+      _startedWeightController.text = profileData['startedWeight'] != null ? (profileData['startedWeight'] as num).toString() : '';
       _usernameController.text = _authService.currentUser?.displayName ?? '';
-      _ageController.text = (profileData['age'] as num? ?? 25).toString();
-      _heightController.text = (profileData['height'] as num? ?? 175.0).toString();
-      _gender = profileData['gender'] as String? ?? 'Male';
-      _activityFactor = profileData['activityFactor'] as int? ?? 3;
+      _ageController.text = profileData['dob'] != null 
+          ? DateTime.fromMillisecondsSinceEpoch(profileData['dob'] as int).toString().split(' ')[0] 
+          : (profileData['age'] != null ? '${profileData['age']} years' : '');
+      if (profileData['dob'] != null) {
+        _dob = DateTime.fromMillisecondsSinceEpoch(profileData['dob'] as int);
+      }
+      _heightController.text = profileData['height'] != null ? (profileData['height'] as num).toString() : '';
+      _gender = profileData['gender'] as String?;
+      _activityFactor = profileData['activityFactor'] as int?;
+      _injuries = (profileData['injuries'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [];
     });
   }
 
@@ -82,6 +99,32 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
   }
 
+  Future<void> _pickDateOfBirth() async {
+    final initialDate = _dob ?? DateTime(DateTime.now().year - 25);
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initialDate,
+      firstDate: DateTime(1900),
+      lastDate: DateTime.now(),
+      builder: (context, child) {
+        return Theme(
+          data: ThemeData.light().copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: AppTheme.primaryBlue,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+    if (picked != null) {
+      setState(() {
+        _dob = picked;
+        _ageController.text = "${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}";
+      });
+    }
+  }
+
   Future<void> _saveWeight() async {
     final targetWeightStr = _targetWeightController.text.trim();
     final startedWeightStr = _startedWeightController.text.trim();
@@ -114,23 +157,38 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   }
 
   Future<void> _saveHealthData() async {
-    final ageStr = _ageController.text.trim();
     final heightStr = _heightController.text.trim();
     
-    if (ageStr.isNotEmpty && int.tryParse(ageStr) != null &&
-        heightStr.isNotEmpty && double.tryParse(heightStr) != null) {
-      await FirestoreService.instance.updateProfile({
-        'age': int.parse(ageStr),
-        'height': double.parse(heightStr),
-        'gender': _gender,
-        'activityFactor': _activityFactor,
-      });
-      
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Health metrics updated!'), backgroundColor: Colors.green),
-        );
-      }
+    if (_gender == null || _dob == null || heightStr.isEmpty || _activityFactor == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please fill all health metrics!'), backgroundColor: Colors.redAccent),
+      );
+      return;
+    }
+
+    final height = double.tryParse(heightStr);
+    if (height == null) return;
+
+    // Calculate age from dob
+    final now = DateTime.now();
+    int age = now.year - _dob!.year;
+    if (now.month < _dob!.month || (now.month == _dob!.month && now.day < _dob!.day)) {
+      age--;
+    }
+
+    await FirestoreService.instance.updateProfile({
+      'dob': _dob!.millisecondsSinceEpoch,
+      'age': age,
+      'height': height,
+      'gender': _gender,
+      'activityFactor': _activityFactor,
+      'injuries': _injuries,
+    });
+    
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Health metrics updated!'), backgroundColor: Colors.green),
+      );
     }
   }
 
@@ -328,19 +386,24 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                     ),
                     items: ['Male', 'Female'].map((g) => DropdownMenuItem(value: g, child: Text(g))).toList(),
-                    onChanged: (val) => setState(() => _gender = val!),
+                    onChanged: (val) => setState(() => _gender = val),
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: TextField(
-                    controller: _ageController,
-                    keyboardType: TextInputType.number,
-                    decoration: InputDecoration(
-                      labelText: 'Age',
-                      filled: true,
-                      fillColor: Colors.white,
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                  child: GestureDetector(
+                    onTap: _pickDateOfBirth,
+                    child: AbsorbPointer(
+                      child: TextField(
+                        controller: _ageController,
+                        decoration: InputDecoration(
+                          labelText: 'Date of Birth',
+                          filled: true,
+                          fillColor: Colors.white,
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                          suffixIcon: const Icon(Icons.calendar_today_rounded, size: 20),
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -366,18 +429,64 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   child: DropdownButtonFormField<int>(
                     value: _activityFactor,
                     decoration: InputDecoration(
-                      labelText: 'Activity (1-5)',
+                      labelText: 'Activity Level',
                       filled: true,
                       fillColor: Colors.white,
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                     ),
-                    items: [1, 2, 3, 4, 5].map((a) => DropdownMenuItem(value: a, child: Text(a.toString()))).toList(),
-                    onChanged: (val) => setState(() => _activityFactor = val!),
+                    isExpanded: true,
+                    items: const [
+                      DropdownMenuItem(value: 1, child: Text('1 - Sedentary', overflow: TextOverflow.ellipsis)),
+                      DropdownMenuItem(value: 2, child: Text('2 - Lightly active', overflow: TextOverflow.ellipsis)),
+                      DropdownMenuItem(value: 3, child: Text('3 - Moderately active', overflow: TextOverflow.ellipsis)),
+                      DropdownMenuItem(value: 4, child: Text('4 - Very active', overflow: TextOverflow.ellipsis)),
+                      DropdownMenuItem(value: 5, child: Text('5 - Extra active', overflow: TextOverflow.ellipsis)),
+                    ],
+                    onChanged: (val) => setState(() => _activityFactor = val),
                   ),
                 ),
               ],
             ),
+            const SizedBox(height: 24),
+            Text(
+              'Injured Muscles (Select any that apply)',
+              style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: AppTheme.charcoal),
+            ),
             const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: _availableInjuries.map((injury) {
+                final isSelected = _injuries.contains(injury);
+                return FilterChip(
+                  label: Text(injury),
+                  selected: isSelected,
+                  onSelected: (selected) {
+                    setState(() {
+                      if (selected) {
+                        _injuries.add(injury);
+                      } else {
+                        _injuries.remove(injury);
+                      }
+                    });
+                  },
+                  selectedColor: AppTheme.primaryBlue.withValues(alpha: 0.2),
+                  checkmarkColor: AppTheme.primaryBlue,
+                  labelStyle: TextStyle(
+                    color: isSelected ? AppTheme.primaryBlue : AppTheme.charcoal,
+                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                  ),
+                  backgroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    side: BorderSide(
+                      color: isSelected ? AppTheme.primaryBlue : AppTheme.lightGrey,
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 24),
             ElevatedButton(
               onPressed: _saveHealthData,
               style: ElevatedButton.styleFrom(
@@ -385,7 +494,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
-              child: const Text('Save Health Metrics', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              child: const Text('Save Health Metrics & Injuries', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
             ),
             const SizedBox(height: 32),
 

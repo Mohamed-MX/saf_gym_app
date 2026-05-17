@@ -512,13 +512,8 @@ class _ExerciseRow extends StatelessWidget {
                         const Spacer(),
                         _WeightControl(
                           value: exercise.weights[i],
-                          onDecrement: () {
-                            if (exercise.weights[i] > 0) {
-                              context.read<WorkoutPlanEditorViewModel>().updateWeight(day, index, i, exercise.weights[i] - 1.0);
-                            }
-                          },
-                          onIncrement: () {
-                            context.read<WorkoutPlanEditorViewModel>().updateWeight(day, index, i, exercise.weights[i] + 1.0);
+                          onChanged: (newWeight) {
+                            context.read<WorkoutPlanEditorViewModel>().updateWeight(day, index, i, newWeight);
                           },
                         ),
                         const SizedBox(width: 4),
@@ -536,33 +531,87 @@ class _ExerciseRow extends StatelessWidget {
   }
 }
 
-class _WeightControl extends StatelessWidget {
+class _WeightControl extends StatefulWidget {
   final double value;
-  final VoidCallback onDecrement;
-  final VoidCallback onIncrement;
+  final ValueChanged<double> onChanged;
 
   const _WeightControl({
     required this.value,
-    required this.onDecrement,
-    required this.onIncrement,
+    required this.onChanged,
   });
 
   @override
+  State<_WeightControl> createState() => _WeightControlState();
+}
+
+class _WeightControlState extends State<_WeightControl> {
+  late TextEditingController _controller;
+  final FocusNode _focusNode = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: _formatValue(widget.value));
+    _focusNode.addListener(() {
+      if (!_focusNode.hasFocus) {
+        final val = double.tryParse(_controller.text) ?? 0.0;
+        widget.onChanged(val);
+        _controller.text = _formatValue(val);
+      }
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant _WeightControl oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.value != widget.value && !_focusNode.hasFocus) {
+      _controller.text = _formatValue(widget.value);
+    }
+  }
+
+  String _formatValue(double v) {
+    return v.toStringAsFixed(v.truncateToDouble() == v ? 0 : 1);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        _Btn(icon: Icons.remove, onTap: onDecrement),
-        SizedBox(
-          width: 36,
-          child: Text(
-            value.toStringAsFixed(value.truncateToDouble() == value ? 0 : 1),
-            textAlign: TextAlign.center,
-            style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 13),
+    return SizedBox(
+      width: 50,
+      height: 30,
+      child: TextField(
+        controller: _controller,
+        focusNode: _focusNode,
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        textAlign: TextAlign.center,
+        style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 13),
+        decoration: InputDecoration(
+          contentPadding: EdgeInsets.zero,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(4),
+            borderSide: const BorderSide(color: AppTheme.lightGrey),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(4),
+            borderSide: const BorderSide(color: AppTheme.lightGrey),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(4),
+            borderSide: const BorderSide(color: AppTheme.primaryBlue),
           ),
         ),
-        _Btn(icon: Icons.add, onTap: onIncrement),
-      ],
+        onSubmitted: (val) {
+          final newVal = double.tryParse(val) ?? 0.0;
+          widget.onChanged(newVal);
+          _controller.text = _formatValue(newVal);
+        },
+      ),
     );
   }
 }

@@ -17,6 +17,7 @@ class _UserFormScreenState extends State<UserFormScreen> {
   final TextEditingController _ageController = TextEditingController();
   final TextEditingController _heightController = TextEditingController();
   final TextEditingController _weightController = TextEditingController();
+  final TextEditingController _targetWeightController = TextEditingController();
   int _activityFactor = 3;
 
   bool _isLoading = false;
@@ -29,6 +30,7 @@ class _UserFormScreenState extends State<UserFormScreen> {
     _ageController.dispose();
     _heightController.dispose();
     _weightController.dispose();
+    _targetWeightController.dispose();
     super.dispose();
   }
 
@@ -40,6 +42,7 @@ class _UserFormScreenState extends State<UserFormScreen> {
     final age = int.parse(_ageController.text);
     final height = double.parse(_heightController.text);
     final weight = double.parse(_weightController.text);
+    final targetWeight = double.parse(_targetWeightController.text);
     
     await FirestoreService.instance.updateProfile({
       'hasCompletedForm': true,
@@ -48,7 +51,7 @@ class _UserFormScreenState extends State<UserFormScreen> {
       'height': height,
       'currentWeight': weight,
       'startedWeight': weight,
-      'targetWeight': weight - 10.0,
+      'targetWeight': targetWeight,
       'activityFactor': _activityFactor,
     });
     
@@ -62,9 +65,6 @@ class _UserFormScreenState extends State<UserFormScreen> {
     
     await FirestoreService.instance.updateProfile({
       'hasCompletedForm': true,
-      'currentWeight': 69.0,
-      'startedWeight': 69.0,
-      'targetWeight': 59.0,
     });
     
     if (mounted) {
@@ -133,8 +133,17 @@ class _UserFormScreenState extends State<UserFormScreen> {
                 // Weight Field
                 TextFormField(
                   controller: _weightController,
-                  keyboardType: TextInputType.numberWithOptions(decimal: true),
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   decoration: _inputDecoration('Weight (kg)'),
+                  validator: (val) => val == null || val.isEmpty ? 'Required' : null,
+                ),
+                const SizedBox(height: 16),
+                
+                // Target Weight Field
+                TextFormField(
+                  controller: _targetWeightController,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: _inputDecoration('Target Weight (kg)'),
                   validator: (val) => val == null || val.isEmpty ? 'Required' : null,
                 ),
                 const SizedBox(height: 16),
