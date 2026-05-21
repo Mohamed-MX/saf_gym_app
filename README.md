@@ -5,7 +5,9 @@
     </td>
     <td>
       <h1>SAF Gym App 🏋️‍♂️</h1>
-      <p>A premium, feature-rich gym companion application built with Flutter, designed to help users track their strength training progress with precision and intelligence.</p>
+      <p>
+        A premium gym companion app that leverages AI to completely transform how you train. You can instantly build custom workout plans, stay motivated with engaging gamification, and reps can be logged and counted automaticly Using a custom wearable devices, it captures real-time exercise data for detailed performance tracking and an exceptionally intelligent lifting experiencethat takes the guesswork out.
+      </p>
     </td>
   </tr>
 </table>
