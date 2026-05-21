@@ -13,13 +13,19 @@
 <br />
 
 ![SAF App UI](https://github.com/user-attachments/assets/b18268c5-4ab8-4914-94b1-8ebe10ce3ecf)
+
 ## 🚀 Key Features
 
-- **📊 Advanced Performance Dashboard**
-    - Interactive **Weight Progression Graphs** showing max weight lifted per session.
-    - Sticky summary stats (Reps, Workouts, Exercises, Time Spent) for quick reference.
-    - Filterable progress views (Daily, Weekly, Monthly, Yearly).
-    - **PDF Export**: Generate professional performance reports to share or keep for your records.
+- **💎 Premium UI/UX**
+    - Modern design aesthetic using the **Outfit** font family.
+    - Clean, intuitive navigation with a dedicated Performance Dashboard tab.
+    - Responsive layouts optimized for a seamless mobile experience.
+    
+
+- **🛠 Plan Editor**
+    - Create and customize your own workout routines.
+    - Reorder exercises with intuitive drag-and-drop functionality.
+    - Manage sets, reps, and target muscle groups with ease.
 
 - **🤖 AI-Powered Workout Planning**
     - Generate customized workout plans using advanced **TFLite** AI models locally on device.
@@ -34,18 +40,18 @@
     - Intelligent rep counting via **BLE Wearable Sensor** integration, with exercise-specific algorithms (e.g., utilizing targeted accelerometer axes for movements like shoulder press).
     - Interactive muscle selection map using high-fidelity human body SVGs.
 
+
+
+- **📊 Advanced Performance Dashboard**
+    - Interactive **Weight Progression Graphs** showing max weight lifted per session.
+    - Sticky summary stats (Reps, Workouts, Exercises, Time Spent) for quick reference.
+    - Filterable progress views (Daily, Weekly, Monthly, Yearly).
+    - **PDF Export**: Generate professional performance reports to share or keep for your records.
+
 - **☁️ Cloud Data Synchronization**
     - **Firebase Firestore** integration for secure, cross-device synchronization of user profiles, health metrics, and workout plans.
 
-- **🛠 Plan Editor**
-    - Create and customize your own workout routines.
-    - Reorder exercises with intuitive drag-and-drop functionality.
-    - Manage sets, reps, and target muscle groups with ease.
 
-- **💎 Premium UI/UX**
-    - Modern design aesthetic using the **Outfit** font family.
-    - Clean, intuitive navigation with a dedicated Performance Dashboard tab.
-    - Responsive layouts optimized for a seamless mobile experience.
 
 ## 📱 Screenshots
 
