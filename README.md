@@ -1,14 +1,18 @@
-# SAF Gym App 🏋️‍♂️
-
-SAF is a premium, feature-rich gym companion application built with Flutter, designed to help users track their strength training progress with precision and intelligence.
-
 <table>
   <tr>
-<img width="1376" height="768" alt="UI jmock" src="https://github.com/user-attachments/assets/b18268c5-4ab8-4914-94b1-8ebe10ce3ecf" />
-
+    <td align="center" width="250">
+      <img src="https://github.com/user-attachments/assets/5b51beeb-25d5-48da-83ef-a65892e60010" alt="SAF Logo" width="216" />
+    </td>
+    <td>
+      <h1>SAF Gym App 🏋️‍♂️</h1>
+      <p>A premium, feature-rich gym companion application built with Flutter, designed to help users track their strength training progress with precision and intelligence.</p>
+    </td>
   </tr>
 </table>
 
+<br />
+
+![SAF App UI](https://github.com/user-attachments/assets/b18268c5-4ab8-4914-94b1-8ebe10ce3ecf)
 ## 🚀 Key Features
 
 - **📊 Advanced Performance Dashboard**
