@@ -10,6 +10,11 @@
 // • Equipment           → passed as multi-hot to the AI; rotated per day
 //                         for the exercise fetch pool.
 // • Weight-loss goal    → AI returns exerciseCount=6 + cardio="Treadmill".
+//
+// ══ UPDATED ══════════════════════════════════════════════════════════════════
+// generateWorkout() is now the TFLite FALLBACK ONLY.
+// The primary generator is generateWorkoutWithFallback() in rag_workout_service.dart.
+// ai_workout_plan_screen.dart now calls that function directly.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import 'dart:math';
@@ -111,6 +116,10 @@ const Map<String, String> _dayAbbrevToFull = {
 const List<String> _weekOrder = ['Sun','Mon','Tue','Wen','Thu','Fri','Sat'];
 
 // ── SafAiModelExp ─────────────────────────────────────────────────────────────
+//
+// ⚠️  FALLBACK ONLY — used by rag_workout_service.dart when the FastAPI
+//     backend is unreachable. Do not call generateWorkout() directly from
+//     the UI; use generateWorkoutWithFallback() from rag_workout_service.dart.
 
 class SafAiModelExp {
   SafAiModelExp._();
@@ -118,12 +127,13 @@ class SafAiModelExp {
   static final MuscleWikiService _service = MuscleWikiService();
   static final Random _rng = Random(42);
 
+  /// [FALLBACK ONLY] Local TFLite-based plan generator.
   static Future<WorkoutPlan> generateWorkout({
     required AiExperienceLevel level,
     required AiTrainingGoal goal,
     required Set<String> equipment,
     required Set<String> selectedDays,
-    int exercisesPerDay = 5,  // overridden by AI's exerciseCount per day
+    int exercisesPerDay = 5,
   }) async {
     // ── 1. Sort days ──────────────────────────────────────────────────────────
     final orderedDays = _weekOrder
@@ -172,7 +182,7 @@ class SafAiModelExp {
         goalName   : goal.modelName,
         daysPerWeek: dayCount,
         dayIndex   : i + 1,
-        uiEquipment: equipment,         // ← full set, not just one item
+        uiEquipment: equipment,
       );
 
       // ── 5d. Filter exercises: category pool × day muscles ──────────────────
@@ -209,8 +219,6 @@ class SafAiModelExp {
       // ── 5e. Cardio block — inserted FIRST when AI says so ─────────────────
       if (aiDecision.hasCardio) {
         final cardioName = '${aiDecision.cardio} Cardio';
-        // The training data uses 6 as the cardio duration in the exercise_count
-        // column; treat that same number as minutes for the cardio block.
         const int cardioMins = 6;
         plannedExercises.insert(0, PlannedExercise(
           exerciseId  : -1 * (i + 1),

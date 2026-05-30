@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
 import '../services/saf_database.dart';
+import '../services/firestore_service.dart';
+import '../services/rag_workout_service.dart';
 import '../models/workout_plan.dart';
-import 'saf_ai_model_exp.dart';
+import 'saf_ai_model_exp.dart'; // kept for enum types (AiTrainingGoal, AiExperienceLevel)
 
 // ── Data Models ───────────────────────────────────────────────────────────────
 
@@ -124,11 +126,30 @@ class _AiWorkoutPlanScreenState extends State<AiWorkoutPlanScreen>
     String? errorMsg;
 
     try {
-      plan = await SafAiModelExp.generateWorkout(
-        level: _selectedLevel.aiLevel,
-        goal: _selectedGoal.aiGoal,
-        equipment: Set.from(_selectedEquipment),
-        selectedDays: Set.from(_selectedDays),
+      // ── Fetch user profile from Firestore for RAG context ─────────────────
+      final profile = await FirestoreService.instance.getProfile();
+
+      final int    age      = (profile['age']           as num?)?.toInt()    ?? 25;
+      final String gender   = (profile['gender']        as String?)?.toLowerCase() ?? 'male';
+      final double height   = (profile['height']        as num?)?.toDouble() ?? 170.0;
+      final double weight   = (profile['currentWeight'] as num?)?.toDouble() ?? 70.0;
+      final double bmi      = weight / ((height / 100) * (height / 100));
+
+      // Map injuries from profile if stored, default to 'none'
+      final String injuries = (profile['injuries'] as String?) ?? 'none';
+
+      // ── Call RAG backend (falls back to TFLite if unreachable) ────────────
+      plan = await generateWorkoutWithFallback(
+        age          : age,
+        gender       : gender,
+        heightCm     : height,
+        weightKg     : weight,
+        bmi          : double.parse(bmi.toStringAsFixed(1)),
+        goal         : _selectedGoal.aiGoal.modelName,
+        experience   : _selectedLevel.aiLevel.name,
+        selectedDays : Set.from(_selectedDays),
+        equipment    : Set.from(_selectedEquipment),
+        injuries     : injuries,
       );
     } catch (e) {
       errorMsg = 'Error: $e';
