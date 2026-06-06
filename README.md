@@ -30,7 +30,7 @@
     - Manage sets, reps, and target muscle groups with ease.
 
 - **🤖 AI-Powered Workout Planning**
-    - Generate customized workout plans using advanced **TFLite** AI models locally on device.
+    - Generate customized workout plans using a cloud-hosted **RAG (Retrieval-Augmented Generation) API**.
     - Tailor routines based on your fitness goals, injury profile, and available equipment.
 
 - **🎮 Sensor-Linked Rhythm Game**
@@ -92,9 +92,10 @@
    ```
 
 3. **Set up environment**
-    - Create a `firebase_options.dart ` file in the root directory.
-    - Add your necessary API keys (e.g., for AI features).
-
+    - Create a `firebase_options.dart` file in the root directory.
+    - **Host the API backend**: Deploy the `backend/` folder to a service like Vercel or Render.
+    - Aadd your hosted API and any other API like an exercise API eaither custom or already exesting:
+     
 4. **Run the app**
    ```bash
    flutter run
