@@ -136,7 +136,10 @@ class _AiWorkoutPlanScreenState extends State<AiWorkoutPlanScreen>
       final double bmi      = weight / ((height / 100) * (height / 100));
 
       // Map injuries from profile if stored, default to 'none'
-      final String injuries = (profile['injuries'] as String?) ?? 'none';
+      final rawInjuries = profile['injuries'];
+      final String injuries = rawInjuries is List 
+          ? rawInjuries.map((e) => e.toString()).join(', ') 
+          : (rawInjuries as String? ?? 'none');
 
       // ── Call RAG backend (falls back to TFLite if unreachable) ────────────
       plan = await generateWorkoutWithFallback(

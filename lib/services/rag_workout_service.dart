@@ -3,43 +3,25 @@
 // Calls the FastAPI backend to generate a full weekly workout plan using the
 // RAG pipeline (similarity search + LLM). This is the PRIMARY plan generator.
 //
-// Fallback: if the API is unreachable, SafAiModelExp (TFLite) is used instead.
-//
 // ⚠️  TO CHANGE THE SERVER URL:
-//     Update `_baseUrl` below OR set it via flutter_dotenv in your .env file.
-//     - Local dev:    http://10.0.2.2:8000   (Android emulator → localhost)
-//     - Real device:  http://YOUR_PC_IP:8000
-//     - Cloud (prod): https://your-app.onrender.com
+//     Update `VERCEL_URL` via flutter_dotenv in your .env file.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import 'dart:convert';
-import 'dart:math';
 import 'package:http/http.dart' as http;
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../models/workout_plan.dart';
-import 'ai_engine_service.dart';     // TFLite fallback
-import 'muscle_wiki_service.dart';   // exercise data for TFLite fallback path
 
 // ════════════════════════════════════════════════════════════════════════════
-// ⚠️  SERVER URL — change this to your deployed Render/Railway URL
+// ⚠️  SERVER URL — reading from .env with fallback
 // ════════════════════════════════════════════════════════════════════════════
-const String _baseUrl = 'https://your-app-name.onrender.com';
-// const String _baseUrl = 'http://10.0.2.2:8000';   // ← use this for local testing
+final String _baseUrl = dotenv.env['VERCEL_URL'] ?? 'https://saf-gym-app-backend.vercel.app';
 
 // Goal mapping: app labels → dataset labels
 const Map<String, String> _goalToDataset = {
   'hypertrophy': 'gain_muscle',
   'strength':    'strength',
   'weight_loss': 'lose_weight',
-};
-
-// Equipment label mapping: app UI labels → dataset labels
-const Map<String, String> _equipToDataset = {
-  'Barbell':     'barbell',
-  'Dumbbells':   'dumbbell',
-  'Machines':    'machine',
-  'Cables':      'cable',
-  'Bodyweight':  'bodyweight',
-  'Kettlebells': 'kettlebell',
 };
 
 const Map<String, String> _dayAbbrevToFull = {
@@ -57,10 +39,25 @@ class RagWorkoutService {
   RagWorkoutService._();
   static final RagWorkoutService instance = RagWorkoutService._();
 
+  /// Pings the backend health endpoint to "warm up" the Vercel serverless function.
+  /// This prevents the 5-10 second cold start delay when the user clicks generate.
+  Future<void> warmUpBackend() async {
+    try {
+      // ignore: avoid_print
+      print('🔥 Warming up AI backend...');
+      await http.get(Uri.parse('$_baseUrl/health')).timeout(const Duration(seconds: 15));
+      // ignore: avoid_print
+      print('✅ AI backend is warm and ready');
+    } catch (e) {
+      // ignore: avoid_print
+      print('⚠️ Failed to warm up AI backend: $e');
+    }
+  }
+
   // ── Primary: call the FastAPI RAG backend ──────────────────────────────────
 
   /// Generate a full weekly workout plan via the FastAPI backend.
-  /// Returns null if the server is unreachable (use fallback then).
+  /// Returns null if the server is unreachable.
   Future<WorkoutPlan?> generateFromApi({
     required int age,
     required String gender,        // "male" | "female" | "other"
@@ -111,6 +108,10 @@ class RagWorkoutService {
           goal: goal,
           experience: experience,
         );
+      } else if (response.statusCode == 504) {
+        // ignore: avoid_print
+        print('❌ FastAPI timeout (504)');
+        throw Exception('Vercel Timeout (504). Please ensure you redeployed the backend with maxDuration: 60 in vercel.json!');
       } else {
         // ignore: avoid_print
         print('❌ FastAPI error ${response.statusCode}: ${response.body}');
@@ -150,11 +151,19 @@ class RagWorkoutService {
               .cast<Map<String, dynamic>>();
 
       final planned = exerciseList.map((ex) {
+        String? parseString(dynamic value) {
+          if (value == null) return null;
+          if (value is List) return value.map((e) => e.toString()).join(', ');
+          return value.toString();
+        }
+
+        final exerciseName = parseString(ex['exercise']) ?? 'Exercise';
+
         return PlannedExercise(
-          exerciseId  : ex['exercise'].hashCode.abs(),  // synthetic ID
-          name        : ex['exercise'] as String? ?? 'Exercise',
+          exerciseId  : exerciseName.hashCode.abs(),  // synthetic ID
+          name        : exerciseName,
           thumbnailUrl: null,   // RAG plan doesn't include images
-          muscleGroup : ex['target_muscle'] as String?,
+          muscleGroup : parseString(ex['target_muscle']),
           sets        : (ex['sets'] as num?)?.toInt() ?? 3,
           reps        : (ex['reps'] as num?)?.toInt() ?? 12,
         );
@@ -185,9 +194,7 @@ class RagWorkoutService {
 // RagWithFallback — top-level helper used by the UI
 // ════════════════════════════════════════════════════════════════════════════
 
-/// Generates a workout plan:
-///   1. Tries the FastAPI RAG backend (primary)
-///   2. Falls back to the local TFLite model (AiEngineService) if unreachable
+/// Generates a workout plan using the FastAPI RAG backend.
 Future<WorkoutPlan> generateWorkoutWithFallback({
   required int age,
   required String gender,
@@ -222,174 +229,5 @@ Future<WorkoutPlan> generateWorkoutWithFallback({
     return ragPlan;
   }
 
-  // ── 2. Fallback: local TFLite model ────────────────────────────────────────
-  // ignore: avoid_print
-  print('⚠️ RAG unavailable — falling back to TFLite model');
-  return _generateTfliteFallback(
-    goal         : goal,
-    experience   : experience,
-    selectedDays : selectedDays,
-    equipment    : equipment,
-  );
-}
-
-// ── TFLite fallback (original AiEngineService + MuscleWiki pipeline) ─────────
-
-const Map<String, String> _goalModelName = {
-  'hypertrophy': 'hypertrophy',
-  'strength':    'strength',
-  'weight_loss': 'weight_loss',
-};
-
-const Map<String, String> _expModelName = {
-  'beginner':     'beginner',
-  'intermediate': 'intermediate',
-  'advanced':     'advanced',
-};
-
-const List<List<List<String>>> _splitTable = [
-  [['Chest', 'Quads', 'Lats', 'Front Shoulders', 'Hamstrings']],
-  [
-    ['Chest', 'Lats', 'Biceps', 'Triceps', 'Front Shoulders'],
-    ['Quads', 'Hamstrings', 'Glutes', 'Calves'],
-  ],
-  [
-    ['Chest', 'Triceps', 'Front Shoulders'],
-    ['Lats', 'Biceps', 'Traps'],
-    ['Quads', 'Hamstrings', 'Glutes', 'Calves'],
-  ],
-  [
-    ['Chest', 'Triceps', 'Front Shoulders'],
-    ['Lats', 'Biceps', 'Traps'],
-    ['Quads', 'Hamstrings', 'Glutes', 'Calves'],
-    ['Chest', 'Lats', 'Front Shoulders', 'Biceps'],
-  ],
-  [
-    ['Chest', 'Triceps', 'Front Shoulders'],
-    ['Lats', 'Biceps', 'Traps'],
-    ['Quads', 'Hamstrings', 'Glutes', 'Calves'],
-    ['Chest', 'Lats', 'Front Shoulders', 'Biceps'],
-    ['Quads', 'Hamstrings', 'Calves'],
-  ],
-  [
-    ['Chest', 'Triceps', 'Front Shoulders'],
-    ['Lats', 'Biceps', 'Traps'],
-    ['Quads', 'Hamstrings', 'Glutes', 'Calves'],
-    ['Chest', 'Triceps', 'Front Shoulders'],
-    ['Lats', 'Biceps', 'Traps'],
-    ['Quads', 'Hamstrings', 'Glutes', 'Calves'],
-  ],
-  [
-    ['Chest', 'Triceps', 'Front Shoulders'],
-    ['Lats', 'Biceps', 'Traps'],
-    ['Quads', 'Hamstrings', 'Glutes', 'Calves'],
-    ['Chest', 'Lats', 'Front Shoulders', 'Biceps'],
-    ['Abdominals'],
-    ['Chest', 'Triceps', 'Front Shoulders'],
-    ['Lats', 'Biceps', 'Traps'],
-  ],
-];
-
-const Map<String, String> _equipToCategory = {
-  'Barbell':     'Barbell',
-  'Dumbbells':   'Dumbbell',
-  'Machines':    'Machine',
-  'Cables':      'Cable',
-  'Bodyweight':  'Body Only',
-  'Kettlebells': 'Kettlebells',
-};
-
-Future<WorkoutPlan> _generateTfliteFallback({
-  required String goal,
-  required String experience,
-  required Set<String> selectedDays,
-  required Set<String> equipment,
-}) async {
-  final service     = MuscleWikiService();
-  final rng         = Random(42);
-  final orderedDays = _weekOrder
-      .where((d) => selectedDays.contains(d))
-      .toList();
-  final dayCount    = orderedDays.length;
-
-  final categories = equipment
-      .map((e) => _equipToCategory[e])
-      .whereType<String>()
-      .toList();
-  final effectiveCats = categories.isEmpty ? ['Body Only'] : categories;
-
-  // Fetch exercise pools
-  final Map<String, List<MuscleWikiExercise>> poolByCategory = {};
-  for (final cat in effectiveCats) {
-    poolByCategory[cat] =
-        await service.getExercisesFiltered(category: cat, limit: 80);
-  }
-
-  await AiEngineService.instance.init();
-
-  final List<WorkoutDay> workoutDays = [];
-
-  for (int i = 0; i < dayCount; i++) {
-    final dayAbbrev = orderedDays[i];
-    final fullDay   = _dayAbbrevToFull[dayAbbrev] ?? dayAbbrev;
-    final muscles   = _splitTable[dayCount.clamp(1, 7) - 1][i];
-    final dayCategory = effectiveCats[i % effectiveCats.length];
-
-    final aiDecision = await AiEngineService.instance.predictDayTarget(
-      levelName  : _expModelName[experience.toLowerCase()] ?? 'intermediate',
-      goalName   : _goalModelName[goal.toLowerCase()] ?? 'hypertrophy',
-      daysPerWeek: dayCount,
-      dayIndex   : i + 1,
-      uiEquipment: equipment,
-    );
-
-    List<MuscleWikiExercise> pool =
-        List.from(poolByCategory[dayCategory] ?? []);
-    final filtered =
-        pool.where((ex) => ex.primaryMuscles.any(muscles.contains)).toList();
-    if (filtered.isNotEmpty) pool = filtered;
-
-    final seen = <String>{};
-    pool = pool.where((ex) => seen.add(ex.name)).toList();
-    pool.shuffle(Random(rng.nextInt(10000) + i));
-
-    final picked = pool.take(aiDecision.exerciseCount).toList();
-
-    final planned = picked.map((ex) => PlannedExercise(
-          exerciseId  : ex.id,
-          name        : ex.name,
-          thumbnailUrl: ex.displayImageUrl,
-          muscleGroup : ex.muscleSlug ?? ex.primaryMusclesLabel,
-          sets        : aiDecision.sets,
-          reps        : aiDecision.reps,
-        )).toList();
-
-    if (aiDecision.hasCardio) {
-      planned.insert(
-        0,
-        PlannedExercise(
-          exerciseId  : -1 * (i + 1),
-          name        : '${aiDecision.cardio} Cardio',
-          thumbnailUrl: null,
-          muscleGroup : 'Cardio · 6 min',
-          sets        : 1,
-          reps        : 6,
-        ),
-      );
-    }
-
-    workoutDays.add(WorkoutDay(dayName: fullDay, exercises: planned));
-  }
-
-  final levelLabel = experience[0].toUpperCase() + experience.substring(1);
-  final goalLabel  = goal == 'weight_loss' ? 'Fat Loss'
-                   : goal == 'strength'    ? 'Strength'
-                   : 'Hypertrophy';
-
-  return WorkoutPlan(
-    id       : 'tflite_${DateTime.now().millisecondsSinceEpoch}',
-    name     : 'AI Plan · $levelLabel · $goalLabel · ${dayCount}d',
-    days     : workoutDays,
-    createdAt: DateTime.now(),
-  );
+  throw Exception('Failed to generate workout from API. Please check your connection to the Vercel backend.');
 }

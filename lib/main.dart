@@ -16,6 +16,7 @@ import 'screens/signup_screen.dart';
 import 'screens/forgot_password_screen.dart';
 import 'screens/user_form_screen.dart';
 import 'services/firestore_service.dart';
+import 'services/rag_workout_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -23,6 +24,9 @@ Future<void> main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
   await dotenv.load(fileName: '.env');
+  
+  // Fire off a background request to wake up the Vercel backend
+  RagWorkoutService.instance.warmUpBackend();
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
