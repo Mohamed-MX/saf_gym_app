@@ -14,7 +14,7 @@ import '../widgets/ble_sheet.dart';
 
 import 'ai_workout_plan_screen.dart';
 import 'workout_plan_editor_screen.dart';
-import 'performance_dashboard_screen.dart';
+
 import 'workout_session_screen.dart';
 import 'profile_screen.dart';
 
@@ -124,23 +124,6 @@ class _HomeView extends StatelessWidget {
                         context,
                         MaterialPageRoute(
                           builder: (_) => const AiWorkoutPlanScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 14),
-
-                  // Performance Dashboard
-                  _ActionCard(
-                    icon: Icons.bar_chart_rounded,
-                    iconColor: AppTheme.primaryBlue,
-                    title: 'Performance Dashboard',
-                    subtitle: 'View your progress',
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const PerformanceDashboardScreen(),
                         ),
                       );
                     },

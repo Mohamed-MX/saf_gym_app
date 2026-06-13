@@ -21,7 +21,7 @@ class _PerformanceDashboardScreenState extends State<PerformanceDashboardScreen>
   String _filter = 'weekly'; // daily, weekly, monthly, yearly
   bool _isLoading = true;
   List<Map<String, dynamic>> _allLogs = [];
-  List<Map<String, dynamic>> _filteredLogs = [];
+  List<_SessionData> _allSessions = [];
 
   // Stats
   int _totalReps = 0;
@@ -29,6 +29,7 @@ class _PerformanceDashboardScreenState extends State<PerformanceDashboardScreen>
   int _exercisesDone = 0;
   int _totalTimeSeconds = 0;
   double _totalWeightLifted = 0.0;
+  double _previousPeriodVolume = 0.0;
   List<_SessionData> _sessions = [];
 
   @override
@@ -40,44 +41,13 @@ class _PerformanceDashboardScreenState extends State<PerformanceDashboardScreen>
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
     _allLogs = await SafDatabase.instance.getPerformanceLogs();
+    _processAllSessions();
     _applyFilter();
   }
 
-  void _applyFilter() {
-    final now = DateTime.now();
-    DateTime cutoff;
-
-    if (_filter == 'daily') {
-      cutoff = DateTime(now.year, now.month, now.day);
-    } else if (_filter == 'weekly') {
-      cutoff = now.subtract(const Duration(days: 7));
-    } else if (_filter == 'monthly') {
-      cutoff = DateTime(now.year, now.month - 1, now.day);
-    } else { // yearly
-      cutoff = DateTime(now.year - 1, now.month, now.day);
-    }
-
-    _filteredLogs = _allLogs.where((log) {
-      final dt = DateTime.fromMillisecondsSinceEpoch(log['date_time']);
-      return dt.isAfter(cutoff);
-    }).toList();
-
-    _calculateStats();
-    setState(() => _isLoading = false);
-  }
-
-  void _calculateStats() {
-    _totalReps = 0;
-    _workoutsStarted = 0;
-    _exercisesDone = 0;
-    _totalTimeSeconds = 0;
-    _totalWeightLifted = 0.0;
-    _sessions.clear();
-
+  void _processAllSessions() {
     final Map<int, _SessionData> sessionMap = {};
-    final Set<String> uniqueExercises = {};
-
-    for (var log in _filteredLogs) {
+    for (var log in _allLogs) {
       final sessionId = log['session_id'] as int? ?? 0;
       final reps = log['reps'] as int;
       final exName = log['exercise_name'] as String;
@@ -85,13 +55,7 @@ class _PerformanceDashboardScreenState extends State<PerformanceDashboardScreen>
       final timeTaken = log['time_taken_seconds'] as int? ?? 0;
       final weight = (log['weight'] as num?)?.toDouble() ?? 0.0;
       final dt = DateTime.fromMillisecondsSinceEpoch(log['date_time']);
-      
-      _totalReps += reps;
-      _totalTimeSeconds += timeTaken;
-      _totalWeightLifted += (reps * weight);
-      uniqueExercises.add(exName);
 
-      // Use sessionId as grouping key. Fallback to daily grouping if 0.
       int effectiveSessionId = sessionId;
       if (effectiveSessionId == 0) {
         effectiveSessionId = DateTime(dt.year, dt.month, dt.day).millisecondsSinceEpoch;
@@ -114,7 +78,6 @@ class _PerformanceDashboardScreenState extends State<PerformanceDashboardScreen>
         session.maxWeight = weight;
       }
 
-      // Find or create exercise in session
       _ExerciseLogData? exData;
       for (var e in session.exercises) {
         if (e.name == exName) {
@@ -131,18 +94,77 @@ class _PerformanceDashboardScreenState extends State<PerformanceDashboardScreen>
       exData.reps += reps;
       exData.timeTakenSeconds += timeTaken;
       exData.weights.add(weight);
-      
-      // Update timestamp to the earliest set's timestamp
-      if (dt.isBefore(exData.timestamp)) {
-        exData.timestamp = dt; 
-      }
+      if (dt.isBefore(exData.timestamp)) exData.timestamp = dt;
     }
 
-    _sessions = sessionMap.values.toList();
-    _sessions.sort((a, b) => b.date.compareTo(a.date)); // newest first
+    _allSessions = sessionMap.values.toList();
+    _allSessions.sort((a, b) => a.date.compareTo(b.date)); // Oldest first to track history
 
+    final Map<String, double> lastVolumeByName = {};
+    for (var session in _allSessions) {
+      if (lastVolumeByName.containsKey(session.workoutName)) {
+        session.previousVolume = lastVolumeByName[session.workoutName];
+      }
+      lastVolumeByName[session.workoutName] = session.totalWeightLifted;
+    }
+
+    _allSessions = _allSessions.reversed.toList(); // Newest first for display
+  }
+
+  void _applyFilter() {
+    final now = DateTime.now();
+    DateTime cutoff;
+    DateTime prevCutoffStart;
+    DateTime prevCutoffEnd;
+
+    if (_filter == 'daily') {
+      cutoff = DateTime(now.year, now.month, now.day);
+      prevCutoffStart = cutoff.subtract(const Duration(days: 1));
+      prevCutoffEnd = cutoff;
+    } else if (_filter == 'weekly') {
+      cutoff = now.subtract(const Duration(days: 7));
+      prevCutoffStart = cutoff.subtract(const Duration(days: 7));
+      prevCutoffEnd = cutoff;
+    } else if (_filter == 'monthly') {
+      cutoff = DateTime(now.year, now.month - 1, now.day);
+      prevCutoffStart = DateTime(cutoff.year, cutoff.month - 1, cutoff.day);
+      prevCutoffEnd = cutoff;
+    } else { // yearly
+      cutoff = DateTime(now.year - 1, now.month, now.day);
+      prevCutoffStart = DateTime(cutoff.year - 1, cutoff.month, cutoff.day);
+      prevCutoffEnd = cutoff;
+    }
+
+    _sessions = _allSessions.where((s) => s.date.isAfter(cutoff)).toList();
+    
+    _totalReps = 0;
     _workoutsStarted = _sessions.length;
+    _exercisesDone = 0;
+    _totalTimeSeconds = 0;
+    _totalWeightLifted = 0.0;
+    final Set<String> uniqueExercises = {};
+
+    for (var session in _sessions) {
+      _totalTimeSeconds += session.totalTimeSeconds;
+      _totalWeightLifted += session.totalWeightLifted;
+      for (var ex in session.exercises) {
+        _totalReps += ex.reps;
+        uniqueExercises.add(ex.name);
+      }
+    }
     _exercisesDone = uniqueExercises.length;
+
+    // Calculate previous period volume
+    _previousPeriodVolume = 0.0;
+    final prevSessions = _allSessions.where((s) => 
+        (s.date.isAfter(prevCutoffStart) || s.date.isAtSameMomentAs(prevCutoffStart)) && 
+        s.date.isBefore(prevCutoffEnd)
+    );
+    for (var session in prevSessions) {
+      _previousPeriodVolume += session.totalWeightLifted;
+    }
+
+    setState(() => _isLoading = false);
   }
 
   String _formatTime(int seconds) {
@@ -414,9 +436,34 @@ class _PerformanceDashboardScreenState extends State<PerformanceDashboardScreen>
                                       session.workoutName,
                                       style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w800),
                                     ),
-                                    subtitle: Text(
-                                      "${_formatDateTime(session.date)}  •  ${_formatTime(session.totalTimeSeconds)}",
-                                      style: const TextStyle(fontSize: 13, color: AppTheme.mediumGrey),
+                                    subtitle: Row(
+                                      children: [
+                                        Text(
+                                          "${_formatDateTime(session.date)}  •  ${_formatTime(session.totalTimeSeconds)}",
+                                          style: const TextStyle(fontSize: 13, color: AppTheme.mediumGrey),
+                                        ),
+                                        const Spacer(),
+                                        Text(
+                                          "${session.totalWeightLifted.toStringAsFixed(0)} kg",
+                                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.charcoal),
+                                        ),
+                                        if (session.volumePercentageChange != null) ...[
+                                          const SizedBox(width: 4),
+                                          Icon(
+                                            session.volumePercentageChange! >= 0 ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
+                                            color: session.volumePercentageChange! >= 0 ? Colors.green : Colors.red,
+                                            size: 14,
+                                          ),
+                                          Text(
+                                            '${session.volumePercentageChange!.abs().toStringAsFixed(1)}%',
+                                            style: TextStyle(
+                                              color: session.volumePercentageChange! >= 0 ? Colors.green : Colors.red,
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ],
+                                      ],
                                     ),
                                     childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                                     children: session.exercises.map((ex) {
@@ -483,9 +530,17 @@ class _PerformanceDashboardScreenState extends State<PerformanceDashboardScreen>
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                         children: [
-                          Expanded(child: _SummaryItem(label: 'Reps', value: '$_totalReps')),
+                          Expanded(
+                            flex: 2,
+                            child: _SummaryItem(
+                              label: 'Volume (kg)', 
+                              value: _totalWeightLifted.toStringAsFixed(0),
+                              trendPercentage: _previousPeriodVolume > 0 
+                                  ? ((_totalWeightLifted - _previousPeriodVolume) / _previousPeriodVolume) * 100 
+                                  : null,
+                            ),
+                          ),
                           Expanded(child: _SummaryItem(label: 'Workouts', value: '$_workoutsStarted')),
-                          Expanded(child: _SummaryItem(label: 'Exercises', value: '$_exercisesDone')),
                           Expanded(child: _SummaryItem(label: 'Time Spent', value: _formatTime(_totalTimeSeconds))),
                         ],
                       ),
@@ -507,6 +562,13 @@ class _SessionData {
   double totalWeightLifted = 0.0;
   double maxWeight = 0.0;
   List<_ExerciseLogData> exercises = [];
+  
+  double? previousVolume;
+
+  double? get volumePercentageChange {
+    if (previousVolume == null || previousVolume == 0) return null;
+    return ((totalWeightLifted - previousVolume!) / previousVolume!) * 100;
+  }
 
   _SessionData({
     required this.sessionId,
@@ -532,13 +594,38 @@ class _ExerciseLogData {
 class _SummaryItem extends StatelessWidget {
   final String label;
   final String value;
-  const _SummaryItem({required this.label, required this.value});
+  final double? trendPercentage;
+
+  const _SummaryItem({required this.label, required this.value, this.trendPercentage});
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Text(value, style: GoogleFonts.outfit(fontSize: 22, fontWeight: FontWeight.w800, color: AppTheme.white), maxLines: 1, overflow: TextOverflow.ellipsis),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.baseline,
+          textBaseline: TextBaseline.alphabetic,
+          children: [
+            Text(value, style: GoogleFonts.outfit(fontSize: 22, fontWeight: FontWeight.w800, color: AppTheme.white), maxLines: 1, overflow: TextOverflow.ellipsis),
+            if (trendPercentage != null) ...[
+              const SizedBox(width: 4),
+              Icon(
+                trendPercentage! >= 0 ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
+                color: trendPercentage! >= 0 ? Colors.greenAccent : Colors.redAccent,
+                size: 14,
+              ),
+              Text(
+                '${trendPercentage!.abs().toStringAsFixed(1)}%',
+                style: TextStyle(
+                  color: trendPercentage! >= 0 ? Colors.greenAccent : Colors.redAccent,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ],
+        ),
         Text(label, style: const TextStyle(fontSize: 11, color: Colors.white70), maxLines: 1, overflow: TextOverflow.ellipsis),
       ],
     );

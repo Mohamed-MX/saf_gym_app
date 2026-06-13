@@ -33,6 +33,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   int _missedWorkouts = 5;
 
   List<String> _injuries = [];
+  bool _isLoading = true;
 
   @override
   void initState() {
@@ -72,6 +73,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _completedWorkouts = completedDays.length;
       _startedWorkouts = 7; // Weekly Goal
       _missedWorkouts = (now.weekday - _completedWorkouts).clamp(0, 7);
+      _isLoading = false;
     });
   }
 
@@ -206,7 +208,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final username = _authService.currentUser?.displayName ?? 'User';
-    bool isProfileIncomplete = _currentWeight == null || _targetWeight == null || _height == null || _age == null || _gender == null;
+    bool isProfileIncomplete = !_isLoading && (_currentWeight == null || _targetWeight == null || _height == null || _age == null || _gender == null);
 
     // Calculate weight progress (clamped between 0 and 1)
     double weightProgress = 0.0;

@@ -386,7 +386,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                     ),
                     items: ['Male', 'Female'].map((g) => DropdownMenuItem(value: g, child: Text(g))).toList(),
-                    onChanged: (val) => setState(() => _gender = val),
+                    onChanged: null, // Gender cannot be changed after registration
                   ),
                 ),
                 const SizedBox(width: 12),

@@ -158,7 +158,6 @@ class RagWorkoutService {
         }
 
         final exerciseName = parseString(ex['exercise']) ?? 'Exercise';
-
         return PlannedExercise(
           exerciseId  : exerciseName.hashCode.abs(),  // synthetic ID
           name        : exerciseName,
