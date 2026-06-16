@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../viewmodels/workout_plan_editor_viewmodel.dart';
 import '../models/workout_plan.dart';
 import '../theme/app_theme.dart';
+import '../config/app_config.dart';
 import 'exercise_picker_screen.dart';
 
 class WorkoutPlanEditorScreen extends StatelessWidget {
@@ -394,6 +395,7 @@ class _ExerciseRow extends StatelessWidget {
                   child: exercise.thumbnailUrl != null
                       ? Image.network(
                           exercise.thumbnailUrl!,
+                          headers: AppConfig.mediaHeaders,
                           fit: BoxFit.cover,
                           errorBuilder: (context, err, _) => Container(
                             color: AppTheme.primaryBlue.withValues(alpha: 0.1),

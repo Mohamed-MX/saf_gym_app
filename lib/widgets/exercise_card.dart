@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/muscle_wiki_service.dart';
+import '../config/app_config.dart';
 import '../theme/app_theme.dart';
 
 class ExerciseCard extends StatelessWidget {
@@ -41,6 +42,7 @@ class ExerciseCard extends StatelessWidget {
                   child: exercise.displayImageUrl != null
                       ? Image.network(
                           exercise.displayImageUrl!,
+                          headers: AppConfig.mediaHeaders,
                           fit: BoxFit.cover,
                           loadingBuilder: (context, child, progress) {
                             if (progress == null) return child;

@@ -10,6 +10,7 @@ import '../models/workout_plan.dart';
 import '../services/muscle_wiki_service.dart';
 import '../services/saf_database.dart';
 import '../theme/app_theme.dart';
+import '../config/app_config.dart';
 import '../widgets/ble_sheet.dart';
 import 'exercise_detail_screen.dart';
 
@@ -589,7 +590,10 @@ class _ExerciseCard extends StatelessWidget {
                             borderRadius: BorderRadius.circular(20),
                             image: exercise.thumbnailUrl != null
                                 ? DecorationImage(
-                                    image: NetworkImage(exercise.thumbnailUrl!),
+                                    image: NetworkImage(
+                                      exercise.thumbnailUrl!,
+                                      headers: AppConfig.mediaHeaders,
+                                    ),
                                     fit: BoxFit.cover,
                                   )
                                 : null,

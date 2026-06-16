@@ -5,6 +5,7 @@ import '../services/saf_database.dart';
 import '../services/firestore_service.dart';
 import '../services/rag_workout_service.dart';
 import '../models/workout_plan.dart';
+import '../config/app_config.dart';
 import 'saf_ai_model_exp.dart'; // kept for enum types (AiTrainingGoal, AiExperienceLevel)
 
 // ── Data Models ───────────────────────────────────────────────────────────────
@@ -1215,6 +1216,7 @@ class _ExercisePreviewRow extends StatelessWidget {
             child: exercise.thumbnailUrl != null
                 ? Image.network(
                     exercise.thumbnailUrl!,
+                    headers: AppConfig.mediaHeaders,
                     width: 44,
                     height: 44,
                     fit: BoxFit.cover,

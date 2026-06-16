@@ -5,6 +5,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../viewmodels/exercise_picker_viewmodel.dart';
 import '../services/muscle_wiki_service.dart';
 import '../theme/app_theme.dart';
+import '../config/app_config.dart';
 import 'exercise_detail_screen.dart';
 
 // Mapping of svg muscle group "id" → our asset file for the blue overlay
@@ -675,6 +676,7 @@ class _PickerExerciseCard extends StatelessWidget {
                 child: exercise.displayImageUrl != null
                     ? Image.network(
                         exercise.displayImageUrl!,
+                        headers: AppConfig.mediaHeaders,
                         fit: BoxFit.cover,
                         errorBuilder: (context, err, _) => Container(
                           color: AppTheme.primaryBlue.withValues(alpha: 0.1),

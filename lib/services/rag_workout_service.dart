@@ -11,6 +11,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../models/workout_plan.dart';
+import '../services/muscle_wiki_service.dart';
 
 // ════════════════════════════════════════════════════════════════════════════
 // ⚠️  SERVER URL — reading from .env with fallback
@@ -102,7 +103,7 @@ class RagWorkoutService {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
-        return _mapApiResponseToPlan(
+        return await _mapApiResponseToPlan(
           data: data,
           orderedDays: orderedDays,
           goal: goal,
@@ -126,12 +127,12 @@ class RagWorkoutService {
 
   // ── Map API response → WorkoutPlan ────────────────────────────────────────
 
-  WorkoutPlan _mapApiResponseToPlan({
+  Future<WorkoutPlan> _mapApiResponseToPlan({
     required Map<String, dynamic> data,
     required List<String> orderedDays,
     required String goal,
     required String experience,
-  }) {
+  }) async {
     final weeklyProgram =
         data['weekly_program'] as Map<String, dynamic>? ?? {};
 
@@ -150,7 +151,7 @@ class RagWorkoutService {
           (weeklyProgram[dayKey] as List<dynamic>? ?? [])
               .cast<Map<String, dynamic>>();
 
-      final planned = exerciseList.map((ex) {
+      final futures = exerciseList.map((ex) async {
         String? parseString(dynamic value) {
           if (value == null) return null;
           if (value is List) return value.map((e) => e.toString()).join(', ');
@@ -158,15 +159,32 @@ class RagWorkoutService {
         }
 
         final exerciseName = parseString(ex['exercise']) ?? 'Exercise';
+        
+        // Try to match with MuscleWiki to grab the real ID and media
+        int finalId = exerciseName.hashCode.abs();
+        String? thumb;
+        
+        try {
+          final mwService = MuscleWikiService();
+          final results = await mwService.getExercisesFiltered(search: exerciseName, limit: 1);
+          if (results.isNotEmpty) {
+            final match = results.first;
+            finalId = match.id;
+            thumb = match.displayImageUrl; // will be og_image or gifUrl
+          }
+        } catch (_) {}
+
         return PlannedExercise(
-          exerciseId  : exerciseName.hashCode.abs(),  // synthetic ID
+          exerciseId  : finalId,
           name        : exerciseName,
-          thumbnailUrl: null,   // RAG plan doesn't include images
+          thumbnailUrl: thumb,
           muscleGroup : parseString(ex['target_muscle']),
           sets        : (ex['sets'] as num?)?.toInt() ?? 3,
           reps        : (ex['reps'] as num?)?.toInt() ?? 12,
         );
       }).toList();
+
+      final planned = await Future.wait(futures);
 
       workoutDays.add(WorkoutDay(dayName: fullDay, exercises: planned));
     }
