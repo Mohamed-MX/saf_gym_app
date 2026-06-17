@@ -93,7 +93,7 @@ class _AiWorkoutPlanScreenState extends State<AiWorkoutPlanScreen>
   // ── Validation ──────────────────────────────────────────────────────────
 
   bool get _canGenerate =>
-      _selectedDays.isNotEmpty && _selectedEquipment.isNotEmpty;
+      _selectedDays.length > 2 && _selectedEquipment.isNotEmpty;
 
   void _showValidationSnack(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -109,8 +109,13 @@ class _AiWorkoutPlanScreenState extends State<AiWorkoutPlanScreen>
   // ── Generate ────────────────────────────────────────────────────────────
 
   Future<void> _onGenerate() async {
-    if (_selectedDays.isEmpty) {
-      _showValidationSnack('Please select at least one training day.');
+    if (_selectedDays.length <= 2) {
+      final needed = 3 - _selectedDays.length;
+      if (_selectedDays.isEmpty) {
+        _showValidationSnack('Please select at least 3 training days.');
+      } else {
+        _showValidationSnack('Please add $needed more day${needed > 1 ? 's' : ''}.');
+      }
       return;
     }
     if (_selectedEquipment.isEmpty) {
