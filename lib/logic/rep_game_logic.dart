@@ -45,6 +45,10 @@ class RepGameLogic {
   double peakAx = 0, peakAy = 0, peakAz = 0;
   double calibrationRom = 12000.0; // Fixed denominator for first rep to prevent wild teleporting
   
+  bool _axisLocked = false;
+  double _axisX = 0, _axisY = 1, _axisZ = 0; // Default to Y axis
+  double maxReach = 10.0;
+  
   bool isHigh = false;
   double lastActiveVal = 0.0;
   double currentPipeSpeed = 0.0;
@@ -69,6 +73,10 @@ class RepGameLogic {
     lastRepTime = 0;
     lastActiveVal = 0.0;
     currentPipeSpeed = 0.0;
+    
+    _axisLocked = false;
+    _axisX = 0; _axisY = 1; _axisZ = 0;
+    maxReach = 10.0;
   }
 
   void updateSensor(double ax, double ay, double az) {
@@ -91,6 +99,23 @@ class RepGameLogic {
       currentDist = sqrt(dy * dy + dz * dz);
     } else {
       currentDist = sqrt(dx * dx + dy * dy + dz * dz);
+    }
+    
+    // Determine the primary axis of movement to isolate position and ignore off-axis rotation
+    if (!_axisLocked && currentDist > 500.0) {
+      _axisLocked = true;
+      if (dx.abs() > dy.abs() && dx.abs() > dz.abs()) {
+        _axisX = 1; _axisY = 0; _axisZ = 0;
+      } else if (dz.abs() > dy.abs() && dz.abs() > dx.abs()) {
+        _axisX = 0; _axisY = 0; _axisZ = 1;
+      } else {
+        _axisX = 0; _axisY = 1; _axisZ = 0;
+      }
+    }
+
+    double signedDist = dx * _axisX + dy * _axisY + dz * _axisZ;
+    if (signedDist.abs() > maxReach) {
+      maxReach = signedDist.abs();
     }
     
     if (currentDist > maxDist) {
@@ -123,14 +148,10 @@ class RepGameLogic {
     }
 
 
-    // Anchored mapping
-    double defaultY = invertSensorMovement ? 0.158 : 0.842;
-    double targetY = defaultY;
-    if (rom > 10.0) {
-      targetY = invertSensorMovement
-          ? 0.158 + (normalizedDist * 0.684)  // Moves DOWN to 0.842
-          : 0.842 - (normalizedDist * 0.684); // Moves UP to 0.158
-    }
+    // Anchored mapping using signed distance to naturally follow up/down movement
+    // Map -maxReach to bottom (0.842), 0 to center (0.5), +maxReach to top (0.158)
+    double positionFrac = signedDist / maxReach; // -1.0 to 1.0
+    double targetY = 0.5 - (positionFrac * (0.5 - 0.158));
         
     targetY = targetY.clamp(0.0, 1.0);
     ballY += (targetY - ballY) * 0.18;
@@ -157,6 +178,26 @@ class RepGameLogic {
 
     double bX = kBirdX * screenW;
     double bY = ballY * screenH;
+    
+    // Keep the ball within the screen limits (borders of the game screen)
+    if (bY < kBirdRadius) bY = kBirdRadius;
+    if (bY > screenH - kBirdRadius) bY = screenH - kBirdRadius;
+    ballY = bY / screenH;
+
+    // ── Magnetic pull: stars attract the ball ────────────────────────────────
+    const double kMagnetRange    = 220.0; // horizontal px range where pull activates
+    const double kMagnetStrength = 0.018; // max fraction of gap closed per frame
+    for (final star in items) {
+      if (star.collected) continue;
+      double starCenterX = star.x + kPipeWidth / 2;
+      double horizDist   = (bX - starCenterX).abs();
+      if (horizDist < kMagnetRange) {
+        double strength = kMagnetStrength * (1.0 - horizDist / kMagnetRange);
+        double starY    = star.yPos * screenH;
+        bY             += (starY - bY) * strength;
+      }
+    }
+    ballY = bY / screenH; // sync after pull before collision clamping below
 
     // Move existing stars using user-driven speed
     for (int i = 0; i < items.length; i++) {
