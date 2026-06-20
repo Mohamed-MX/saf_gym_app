@@ -101,19 +101,9 @@ class RepGameLogic {
       currentDist = sqrt(dx * dx + dy * dy + dz * dz);
     }
     
-    // Determine the primary axis of movement to isolate position and ignore off-axis rotation
-    if (!_axisLocked && currentDist > 500.0) {
-      _axisLocked = true;
-      if (dx.abs() > dy.abs() && dx.abs() > dz.abs()) {
-        _axisX = 1; _axisY = 0; _axisZ = 0;
-      } else if (dz.abs() > dy.abs() && dz.abs() > dx.abs()) {
-        _axisX = 0; _axisY = 0; _axisZ = 1;
-      } else {
-        _axisX = 0; _axisY = 1; _axisZ = 0;
-      }
-    }
-
-    double signedDist = dx * _axisX + dy * _axisY + dz * _axisZ;
+    // The ball's up/down movement only responds to the y-axis
+    // Negated to flip the movement (up is down, down is up)
+    double signedDist = -dy;
     if (signedDist.abs() > maxReach) {
       maxReach = signedDist.abs();
     }
@@ -150,7 +140,8 @@ class RepGameLogic {
 
     // Anchored mapping using signed distance to naturally follow up/down movement
     // Map -maxReach to bottom (0.842), 0 to center (0.5), +maxReach to top (0.158)
-    double positionFrac = signedDist / maxReach; // -1.0 to 1.0
+    // Multiplied by 1.45 to make the ball significantly more sensitive to movement.
+    double positionFrac = (signedDist * 1.45) / maxReach; // -1.45 to 1.45
     double targetY = 0.5 - (positionFrac * (0.5 - 0.158));
         
     targetY = targetY.clamp(0.0, 1.0);
@@ -222,7 +213,7 @@ class RepGameLogic {
     // Only spawn stars at the extremes (Start and Peak)
     double startPos = invertSensorMovement ? 0.158 : 0.842;
     double peakPos = invertSensorMovement ? 0.842 : 0.158;
-    List<double> currentPattern = [startPos, peakPos];
+    List<double> currentPattern = [peakPos, startPos];
 
     // Spawn new stars
     if (items.isEmpty) {
