@@ -82,45 +82,59 @@ class MuscleWikiExercise {
 
   // Utility mapper
   static MuscleWikiExercise _mapper(Map<String, dynamic> e) {
-    String? thumbnailUrl;
-    String? gifUrl;
-    List<Map<String, String?>> parsedVideos = [];
-
-    if (e['videos'] != null && e['videos'] is List) {
-      for (var v in e['videos']) {
-        parsedVideos.add({
-          'url': v['url']?.toString(),
-          'og_image': v['og_image']?.toString(),
-          'gender': v['gender']?.toString(),
-          'angle': v['angle']?.toString(),
-        });
-      }
-      if (parsedVideos.isNotEmpty) {
-        // Prefer male front angle if possible, otherwise just the first video.
-        final preferred = parsedVideos.firstWhere(
-          (v) => v['gender'] == 'male' && v['angle'] == 'front',
-          orElse: () => parsedVideos.first,
-        );
-        thumbnailUrl = preferred['og_image'];
-        gifUrl = preferred['url'];
-      }
-    } else {
-      // Fallback
-      thumbnailUrl = e['og_image'];
-      gifUrl = e['url'];
+    if (e.containsKey('primary_muscles')) {
+      // Legacy parse
+      return MuscleWikiExercise(
+        id: e['id'] ?? 0,
+        name: e['name'] ?? 'Unknown',
+        primaryMuscles: List<String>.from(e['primary_muscles'] ?? []),
+        category: e['category'] as String?,
+        difficulty: e['difficulty'] as String?,
+        steps: List<String>.from(e['steps'] ?? []),
+        thumbnailUrl: e['og_image'],
+        gifUrl: e['url'],
+        muscleSlug: e['_muscleSlug'],
+        videos: [],
+      );
     }
+    
+    // Yuhonas DB mapping
+    String? thumb;
+    if (e['images'] != null && (e['images'] as List).isNotEmpty) {
+      thumb = 'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/${e['images'][0]}';
+    }
+    
+    final rawMuscles = List<String>.from(e['primaryMuscles'] ?? []);
+    final mappedMuscles = rawMuscles.map((m) {
+      if (m == 'abdominals') return 'Abdominals';
+      if (m == 'chest') return 'Chest';
+      if (m == 'shoulders') return 'Front Shoulders';
+      if (m == 'biceps') return 'Biceps';
+      if (m == 'forearms') return 'Forearms';
+      if (m == 'quadriceps' || m == 'adductors') return 'Quads';
+      if (m == 'calves') return 'Calves';
+      if (m == 'trapezius') return 'Traps';
+      if (m == 'lats' || m == 'middle back') return 'Lats';
+      if (m == 'triceps') return 'Triceps';
+      if (m == 'hamstrings') return 'Hamstrings';
+      if (m == 'glutes' || m == 'abductors') return 'Glutes';
+      if (m == 'lower back') return 'Lower Back';
+      return '${m[0].toUpperCase()}${m.substring(1)}';
+    }).toList();
+
+    String cap(String s) => s.isEmpty ? s : '${s[0].toUpperCase()}${s.substring(1)}';
 
     return MuscleWikiExercise(
-      id: e['id'] ?? 0,
+      id: e['id'].hashCode.abs() % 100000,
       name: e['name'] ?? 'Unknown',
-      primaryMuscles: List<String>.from(e['primary_muscles'] ?? []),
-      category: e['category'] as String?,
-      difficulty: e['difficulty'] as String?,
-      steps: List<String>.from(e['steps'] ?? []),
-      thumbnailUrl: thumbnailUrl,
-      gifUrl: gifUrl,
-      muscleSlug: e['_muscleSlug'],
-      videos: parsedVideos,
+      primaryMuscles: mappedMuscles,
+      category: e['equipment'] != null ? cap(e['equipment']) : 'Body Only',
+      difficulty: e['level'] != null ? cap(e['level']) : 'Beginner',
+      steps: List<String>.from(e['instructions'] ?? []),
+      thumbnailUrl: thumb,
+      gifUrl: thumb,
+      muscleSlug: mappedMuscles.isNotEmpty ? mappedMuscles.first : null,
+      videos: [],
     );
   }
 }
@@ -128,20 +142,35 @@ class MuscleWikiExercise {
 // ── MuscleWikiService ──────────────────────────────────────────────────────
 
 class MuscleWikiService {
-  static const String _baseUrl = 'https://api.musclewiki.com';
+  static const String _dbUrl = 'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/dist/exercises.json';
 
+  static List<Map<String, dynamic>>? _cachedData;
+
+  Future<List<Map<String, dynamic>>> _fetchData() async {
+    if (_cachedData != null) return _cachedData!;
+    try {
+      final r = await http.get(Uri.parse(_dbUrl)).timeout(const Duration(seconds: 15));
+      if (r.statusCode == 200) {
+        _cachedData = List<Map<String, dynamic>>.from(jsonDecode(r.body));
+        return _cachedData!;
+      }
+    } catch (_) {}
+    return [];
+  }
+
+  // ── Muscle name → API query value (capitalized as the API expects) ──────
   static const Map<String, String> muscleSlugMap = {
     'abdominals': 'Abdominals',
     'obliques': 'Abdominals',
     'chest': 'Chest',
-    'front-shoulders': 'Anterior Deltoid',
+    'front-shoulders': 'Front Shoulders',
     'biceps': 'Biceps',
     'forearms': 'Forearms',
     'quads': 'Quads',
     'calves': 'Calves',
     'traps': 'Traps',
     'lats': 'Lats',
-    'rear-shoulders': 'Posterior Deltoid',
+    'rear-shoulders': 'Rear Delts',
     'triceps': 'Triceps',
     'hamstrings': 'Hamstrings',
     'glutes': 'Glutes',
@@ -173,7 +202,7 @@ class MuscleWikiService {
     MuscleCategory(muscleName: 'Lats', displayName: 'Lats', icon: Icons.accessibility_new),
     MuscleCategory(muscleName: 'Biceps', displayName: 'Biceps', icon: Icons.sports_gymnastics),
     MuscleCategory(muscleName: 'Triceps', displayName: 'Triceps', icon: Icons.sports_gymnastics),
-    MuscleCategory(muscleName: 'Anterior Deltoid', displayName: 'Shoulders', icon: Icons.person),
+    MuscleCategory(muscleName: 'Front Shoulders', displayName: 'Shoulders', icon: Icons.person),
     MuscleCategory(muscleName: 'Abdominals', displayName: 'Abs', icon: Icons.sports_martial_arts),
     MuscleCategory(muscleName: 'Quads', displayName: 'Quads', icon: Icons.directions_run),
     MuscleCategory(muscleName: 'Hamstrings', displayName: 'Hamstrings', icon: Icons.directions_run),
@@ -185,7 +214,7 @@ class MuscleWikiService {
 
   static const List<String> _workoutMuscles = [
     'Chest', 'Lats', 'Biceps', 'Triceps',
-    'Anterior Deltoid', 'Abdominals', 'Quads',
+    'Front Shoulders', 'Abdominals', 'Quads',
     'Hamstrings', 'Glutes', 'Calves', 'Traps',
   ];
 
@@ -198,37 +227,26 @@ class MuscleWikiService {
     int limit = 20,
   }) async {
     final apiMuscle = muscleSlugMap[muscle] ?? muscle;
-    final uri = Uri.parse('$_baseUrl/exercises?muscles=${Uri.encodeQueryComponent(apiMuscle)}&limit=$limit');
-    
-    try {
-      final r = await http.get(uri, headers: AppConfig.apiHeaders).timeout(const Duration(seconds: 15));
-      if (r.statusCode == 200) {
-        final data = jsonDecode(r.body);
-        final resultsList = data['results'] as List;
-        
-        // The list endpoint only returns id and name. Fetch full details concurrently:
-        final futures = resultsList.map((e) => getExerciseById(e['id'], muscleSlug: muscle));
-        final detailedList = await Future.wait(futures);
-        return detailedList.whereType<MuscleWikiExercise>().toList();
-      }
-    } catch (_) {}
-    return [];
+    final allData = await _fetchData();
+    var results = allData.map((e) => MuscleWikiExercise._mapper(e))
+        .where((e) => e.primaryMuscles.contains(apiMuscle))
+        .toList();
+    if (results.length > limit) results = results.sublist(0, limit);
+    return results.map((e) => e.withSlug(muscle)).toList();
   }
 
   Future<MuscleWikiExercise?> getExerciseById(
     int id, {
     String? muscleSlug,
   }) async {
-    final uri = Uri.parse('$_baseUrl/exercises/$id');
+    final allData = await _fetchData();
     try {
-      final r = await http.get(uri, headers: AppConfig.apiHeaders).timeout(const Duration(seconds: 15));
-      if (r.statusCode == 200) {
-        final data = jsonDecode(r.body);
-        final ex = MuscleWikiExercise._mapper(data);
-        return muscleSlug != null ? ex.withSlug(muscleSlug) : ex;
-      }
-    } catch (_) {}
-    return null;
+      final mapped = allData.map((e) => MuscleWikiExercise._mapper(e));
+      final ex = mapped.firstWhere((e) => e.id == id);
+      return muscleSlug != null ? ex.withSlug(muscleSlug) : ex;
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<List<MuscleWikiExercise>> getDailyWorkoutExercises({
@@ -254,59 +272,50 @@ class MuscleWikiService {
     int limit = 20,
     int offset = 0,
   }) async {
-    String query = 'limit=$limit&offset=$offset';
+    final allData = await _fetchData();
+    var mapped = allData.map((e) => MuscleWikiExercise._mapper(e)).toList();
+
     if (search != null && search.isNotEmpty) {
-      query += '&search=${Uri.encodeQueryComponent(search)}';
+      final s = search.toLowerCase();
+      mapped = mapped.where((e) => e.name.toLowerCase().contains(s)).toList();
     }
     if (muscles != null && muscles.isNotEmpty) {
-      // Just map the first one for simplicity since the API expects a single string for `muscles`.
-      final apiMuscle = muscleSlugMap[muscles.first] ?? muscles.first;
-      query += '&muscles=${Uri.encodeQueryComponent(apiMuscle)}';
+      final mappedFilterMuscles = muscles.map((m) => muscleSlugMap[m] ?? m).toList();
+      mapped = mapped.where((e) => e.primaryMuscles.any((m) => mappedFilterMuscles.contains(m))).toList();
     }
     if (category != null && category.isNotEmpty && category != 'None') {
-      query += '&category=${Uri.encodeQueryComponent(category)}';
+      mapped = mapped.where((e) => e.category?.toLowerCase() == category.toLowerCase()).toList();
     }
     if (difficulty != null && difficulty.isNotEmpty && difficulty != 'None') {
-      query += '&difficulty=${Uri.encodeQueryComponent(difficulty.toLowerCase())}';
+      mapped = mapped.where((e) => e.difficulty?.toLowerCase() == difficulty.toLowerCase()).toList();
     }
 
-    final uri = Uri.parse('$_baseUrl/exercises?$query');
-    try {
-      final r = await http.get(uri, headers: AppConfig.apiHeaders).timeout(const Duration(seconds: 15));
-      if (r.statusCode == 200) {
-        final data = jsonDecode(r.body);
-        final resultsList = data['results'] as List;
-        
-        final futures = resultsList.map((e) => getExerciseById(e['id']));
-        final detailedList = await Future.wait(futures);
-        return detailedList.whereType<MuscleWikiExercise>().toList();
-      }
-    } catch (_) {}
-    return [];
+    if (offset >= mapped.length) return [];
+    var end = offset + limit;
+    if (end > mapped.length) end = mapped.length;
+    return mapped.sublist(offset, end);
   }
 
   Future<List<String>> getApiMuscles() async {
-    final uri = Uri.parse('$_baseUrl/muscles');
-    try {
-      final r = await http.get(uri, headers: AppConfig.apiHeaders).timeout(const Duration(seconds: 15));
-      if (r.statusCode == 200) {
-        final data = jsonDecode(r.body) as List;
-        return data.map((e) => e['name'].toString()).toList();
-      }
-    } catch (_) {}
-    return [];
+    final allData = await _fetchData();
+    final muscles = <String>{};
+    for (var e in allData) {
+      final mEx = MuscleWikiExercise._mapper(e);
+      muscles.addAll(mEx.primaryMuscles);
+    }
+    return muscles.toList()..sort();
   }
 
   Future<List<String>> getApiCategories() async {
-    final uri = Uri.parse('$_baseUrl/categories');
-    try {
-      final r = await http.get(uri, headers: AppConfig.apiHeaders).timeout(const Duration(seconds: 15));
-      if (r.statusCode == 200) {
-        final data = jsonDecode(r.body) as List;
-        return data.map((e) => e['display_name'].toString()).toList();
+    final allData = await _fetchData();
+    final categories = <String>{};
+    for (var e in allData) {
+      final mEx = MuscleWikiExercise._mapper(e);
+      if (mEx.category != null && mEx.category!.isNotEmpty && mEx.category != 'None') {
+        categories.add(mEx.category!);
       }
-    } catch (_) {}
-    return [];
+    }
+    return categories.toList()..sort();
   }
 
   // ── Static helpers ──────────────────────────────────────────────────────
