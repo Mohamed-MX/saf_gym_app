@@ -104,5 +104,6 @@
 ---
 
 *Developed as a graduation project by
-[Mohamed M. Basyony](https://github.com/Mohamed-MX).*
-[San Saad](https://github.com/sonson818).*
+[Mohamed M. Basyony](https://github.com/Mohamed-MX),*
+[San Saad](https://github.com/sonson818),
+[Ahmed Fathy](https://github.com/ahmedfathy44).
